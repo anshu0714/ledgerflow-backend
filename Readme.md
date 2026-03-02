@@ -113,6 +113,10 @@ Server will run on: [http://localhost:3000](http://localhost:3000)
 
 ## API Endpoints
 
+### Root Endpoint
+
+- `GET /` — Returns a message confirming the service is running.
+
 ### Accounts
 
 - `POST /api/accounts` — Create new account
