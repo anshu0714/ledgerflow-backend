@@ -13,7 +13,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /transactions:
+ * /api/transactions:
  *   post:
  *     summary: Create a new transaction
  *     tags: [Transactions]
@@ -47,7 +47,7 @@ router.post(
 
 /**
  * @swagger
- * /transactions/system/initial-fund:
+ * /api/transactions/system/initial-fund:
  *   post:
  *     summary: Create initial system fund (admin only)
  *     tags: [Transactions]
