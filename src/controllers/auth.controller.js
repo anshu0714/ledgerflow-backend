@@ -47,7 +47,9 @@ async function userRegisterController(req, res) {
       token: token,
     });
 
-    await emailService.userRegistrationEmail(user.name, user.email);
+    emailService
+      .userRegistrationEmail(user.name, user.email)
+      .catch((err) => console.log(err.msg));
   } catch (error) {
     console.log("Something went wrong: ", error);
 

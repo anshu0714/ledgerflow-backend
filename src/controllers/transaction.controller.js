@@ -22,17 +22,15 @@ async function createTransaction(req, res) {
       idempotencyKey,
     });
 
-    try {
-      await emailService.transactionSuccessEmail(
+    emailService
+      .transactionSuccessEmail(
         req.user.name,
         req.user.email,
         amount,
         fromAccount,
         toAccount,
-      );
-    } catch (err) {
-      console.error("Email failed:", err);
-    }
+      )
+      .catch((err) => console.log(err.msg));
 
     return res.status(201).json({
       message: "Transaction successful",

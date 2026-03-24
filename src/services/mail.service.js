@@ -13,31 +13,31 @@ const transporter = nodemailer.createTransport({
 
 transporter.verify((error, success) => {
   if (error) {
-    console.log("Error connecting to email server: ", error);
+    console.log("Error connecting to email server: ", error.message);
   } else {
     console.log("Email server is ready!", success);
   }
 });
 
-async function sendEmail(to, subject, text, html) {
-  try {
-    const info = await transporter.sendMail({
+function sendEmail(to, subject, text, html) {
+  transporter
+    .sendMail({
       from: `"Ledgerflow" <${process.env.USER_EMAIL}>`,
       to,
       subject,
       text,
       html,
+    })
+    .then((info) => {
+      console.log("Message sent:", info.messageId);
+    })
+    .catch((error) => {
+      console.log("Error sending email", error.message);
     });
-
-    console.log("Message sent: %s", info.messageId);
-    console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
-  } catch (error) {
-    console.log("Error sending email", error);
-  }
 }
 
 // Registration Email
-async function userRegistrationEmail(userName, email) {
+function userRegistrationEmail(userName, email) {
   const subject = "Your Ledgerflow Account Has Been Successfully Registered";
   const text = `Hi ${userName},
 
@@ -87,7 +87,7 @@ Ledgerflow Team`;
 </body>
 </html>`;
 
-  await sendEmail(email, subject, text, html);
+  sendEmail(email, subject, text, html);
 }
 
 // Transaction Success Email
@@ -151,7 +151,9 @@ Ledgerflow Team`;
 </body>
 </html>`;
 
-  await sendEmail(email, subject, text, html);
+  setImmediate(() => {
+    sendEmail(email, subject, text, html);
+  });
 }
 
 // Transaction Failure Email
@@ -219,7 +221,9 @@ Ledgerflow Team`;
 </body>
 </html>`;
 
-  await sendEmail(email, subject, text, html);
+  setImmediate(() => {
+    sendEmail(email, subject, text, html);
+  });
 }
 
 module.exports = {
