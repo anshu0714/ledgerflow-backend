@@ -3,15 +3,12 @@ const Transaction = require("../models/transaction.model");
 const Ledger = require("../models/ledger.model");
 const runInTransaction = require("../utils/dbTransaction.utils");
 
-async function processTransfer({
-  fromAccount,
-  toAccount,
-  amount,
-  idempotencyKey,
-}) {
+async function processTransfer({ fromAccount, toAccount, amount }) {
   return await runInTransaction(async (session) => {
-    const fromUser = await Account.findById(fromAccount).session(session);
-    const toUser = await Account.findById(toAccount).session(session);
+    const [fromUser, toUser] = await Promise.all([
+      Account.findById(fromAccount).session(session),
+      Account.findById(toAccount).session(session),
+    ]);
 
     if (!fromUser || !toUser) {
       throw new Error("Account not found");
@@ -39,7 +36,6 @@ async function processTransfer({
           fromAccount,
           toAccount,
           amount,
-          idempotencyKey,
           status: "PENDING",
         },
       ],
@@ -72,12 +68,7 @@ async function processTransfer({
   });
 }
 
-async function processInitialFunding({
-  systemAccountId,
-  toAccount,
-  amount,
-  idempotencyKey,
-}) {
+async function processInitialFunding({ systemAccountId, toAccount, amount }) {
   return await runInTransaction(async (session) => {
     const systemAccount =
       await Account.findById(systemAccountId).session(session);
@@ -97,7 +88,6 @@ async function processInitialFunding({
           fromAccount: systemAccount._id,
           toAccount,
           amount,
-          idempotencyKey,
           status: "PENDING",
         },
       ],

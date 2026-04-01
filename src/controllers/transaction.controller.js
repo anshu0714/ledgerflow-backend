@@ -1,27 +1,31 @@
-const Transaction = require("../models/transaction.model");
 const Account = require("../models/account.model");
 const {
   processTransfer,
   processInitialFunding,
 } = require("../services/transaction.service");
 const emailService = require("../services/mail.service");
-const User = require("../models/user.model");
+const handleIdempotentRequest = require("../services/idempotency.service");
 
 async function createTransaction(req, res) {
-  try {
-    const { fromAccount, toAccount, amount, idempotencyKey } = req.body;
+  const { fromAccount, toAccount, amount, idempotencyKey } = req.body;
 
-    if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
+  if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
 
-    const transaction = await processTransfer({
-      fromAccount,
-      toAccount,
-      amount,
-      idempotencyKey,
-    });
+  const result = await handleIdempotentRequest({
+    idempotencyKey,
+    payload: { fromAccount, toAccount, amount },
+    handler: async () => {
+      return await processTransfer({ fromAccount, toAccount, amount });
+    },
+  });
 
+  if (result.type === "ERROR") {
+    return res.status(result.status).json({ message: result.message });
+  }
+
+  if (!result.isReplay) {
     emailService
       .transactionSuccessEmail(
         req.user.name,
@@ -30,79 +34,56 @@ async function createTransaction(req, res) {
         fromAccount,
         toAccount,
       )
-      .catch((err) => console.log(err.msg));
-
-    return res.status(201).json({
-      message: "Transaction successful",
-      transaction,
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      const existing = await Transaction.findOne({
-        idempotencyKey: req.body.idempotencyKey,
-      });
-
-      return res.status(200).json({
-        message: "Transaction already processed",
-        transaction: existing,
-      });
-    }
-
-    return res.status(500).json({
-      message: error.message,
-    });
+      .catch(() => {});
   }
+
+  return res.status(201).json({
+    message: "Transaction successful",
+    transaction: result.data,
+  });
 }
 
 async function createInitialFundTransaction(req, res) {
-  try {
-    const { toAccount, amount, idempotencyKey } = req.body;
+  const { toAccount, amount, idempotencyKey } = req.body;
 
-    if (!toAccount || !amount || !idempotencyKey) {
-      return res.status(400).json({
-        message: "Missing required fields",
-      });
-    }
+  if (!toAccount || !amount || !idempotencyKey) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
 
-    const systemAccount = await Account.findOne({
-      user: req.user._id,
-    });
+  const systemAccount = await Account.findOne({
+    user: req.user._id,
+  });
 
-    if (!systemAccount) {
-      return res.status(400).json({
-        message: "System account not found",
-      });
-    }
-
-    const transaction = await processInitialFunding({
-      systemAccountId: systemAccount._id,
-      toAccount,
-      amount,
-      idempotencyKey,
-    });
-
-    return res.status(201).json({
-      message: "Initial funding successful",
-      transaction,
-    });
-  } catch (error) {
-    console.error("Error in transaction controller:", error);
-
-    if (error.code === 11000) {
-      const existing = await Transaction.findOne({
-        idempotencyKey: req.body.idempotencyKey,
-      });
-
-      return res.status(200).json({
-        message: "Transaction already processed",
-        transaction: existing,
-      });
-    }
-
-    return res.status(500).json({
-      message: error.message,
+  if (!systemAccount) {
+    return res.status(400).json({
+      message: "System account not found",
     });
   }
+
+  const result = await handleIdempotentRequest({
+    idempotencyKey,
+    payload: {
+      fromAccount: systemAccount._id,
+      toAccount,
+      amount,
+    },
+    handler: async () => {
+      return await processInitialFunding({
+        systemAccountId: systemAccount._id,
+        toAccount,
+        amount,
+      });
+    },
+  });
+
+  if (result.type === "ERROR") {
+    return res.status(result.status).json({ message: result.message });
+  }
+
+  return res.status(201).json({
+    message: "Initial funding successful",
+    transaction: result.data,
+  });
 }
 
 module.exports = {
