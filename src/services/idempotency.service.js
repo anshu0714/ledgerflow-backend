@@ -1,4 +1,5 @@
 const IdempotencyKey = require("../models/idempotencyKey.model");
+const Transaction = require("../models/transaction.model");
 const hashRequest = require("../utils/hash.utils");
 
 async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
@@ -12,6 +13,11 @@ async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
     });
 
     const result = await handler();
+    record.resourceId = result._id;
+
+    if (!result || !result._id) {
+      throw new Error("Invalid transaction result");
+    }
 
     record.status = "SUCCESS";
     record.response = result;
@@ -41,6 +47,19 @@ async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
       }
 
       if (existing.status === "PROCESSING") {
+        if (existing.resourceId) {
+          const transaction = await Transaction.findById(
+            existing.resourceId,
+          ).lean();
+          if (transaction && transaction.status === "COMPLETED") {
+            return {
+              type: "SUCCESS",
+              data: transaction.toObject ? transaction.toObject() : transaction,
+              isReplay: true,
+            };
+          }
+        }
+
         return {
           type: "ERROR",
           status: 409,

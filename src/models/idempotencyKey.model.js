@@ -20,6 +20,11 @@ const idempotencyKeySchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    resourceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Transaction",
+      index: true,
+    }
   },
   { timestamps: true },
 );

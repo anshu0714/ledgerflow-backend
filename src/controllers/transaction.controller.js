@@ -34,10 +34,12 @@ async function createTransaction(req, res) {
         fromAccount,
         toAccount,
       )
-      .catch(() => {});
+      .catch((err) => console.error("Email failed:", err.message));
   }
 
-  return res.status(201).json({
+  const statusCode = result.isReplay ? 200 : 201;
+
+  return res.status(statusCode).json({
     message: "Transaction successful",
     transaction: result.data,
   });
