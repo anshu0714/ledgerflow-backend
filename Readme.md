@@ -1,27 +1,70 @@
 # LedgerFlow Backend
 
-A **Node.js** backend application for managing accounts, transactions, and ledgers.  
+A **Node.js** backend application for managing accounts, transactions, and ledgers.
+
 This project implements secure transactions with idempotency checks, ledger entries, and email notifications.
 
-## Table of Contents
-
-- [Features](#features)
-- [Technologies Used](#technologies-used)
-- [Folder Structure](#folder-structure)
-- [Installation](#installation)
-- [Environment Variables](#environment-variables)
-- [Running the Project](#running-the-project)
-- [API Endpoints](#api-endpoints)
-- [License](#license)
+A production-grade backend system simulating fintech-level transaction reliability using idempotency, outbox pattern, and double-entry ledger design.
 
 ## Features
 
-- Account management: create accounts, fetch balance, list user accounts
-- Transactions with idempotency and ledger entries
-- Initial funding support for system accounts
-- JWT-based authentication with token blacklist for logout security
-- Email notifications for transaction success/failure
-- MongoDB transactions for safe debit/credit operations
+### Financial Transaction System
+
+- Double-entry ledger system (DEBIT/CREDIT) ensuring accounting correctness
+- MongoDB transactions for atomic debit/credit operations
+- Immutable ledger entries to prevent tampering
+
+### Idempotency & Exactly-Once Simulation
+
+- Dedicated idempotency layer with request hashing
+- Concurrency-safe handling using unique constraints
+- Recovery mechanism for partially completed requests
+- Prevents duplicate financial transactions under retries
+
+### Outbox Pattern for Reliable Side Effects
+
+- Transactional outbox ensures events are persisted with DB commits
+- Background worker processes events asynchronously
+- Retry mechanism with exponential backoff
+- Guarantees email delivery even after failures or crashes
+
+### Authentication & Security
+
+- JWT-based authentication
+- Token blacklisting for secure logout
+
+### System Reliability
+
+- Handles race conditions and partial failures
+- Designed with production-grade backend patterns inspired by fintech systems
+
+## Architecture Highlights
+
+### Idempotency Flow
+
+- Client Request → Idempotency Layer → Transaction Service → DB
+- Ensures duplicate requests return same response
+- Prevents double-spending scenarios
+
+### Transaction + Ledger Flow
+
+- Transaction → Ledger Entries (DEBIT/CREDIT) → Commit
+- Atomic operation using MongoDB sessions
+- Guarantees consistency of financial data
+
+### Outbox Event Flow
+
+- Transaction Commit → Outbox Event → Background Worker → Send Email
+- Ensures reliable side effects
+- Supports retries and failure recovery
+
+### Failure Handling
+
+- Crash after DB commit → event still processed via outbox
+- Duplicate request → served from idempotency store
+- Email failure → retried automatically
+
+This architecture mimics real-world fintech systems like Stripe and Razorpay.
 
 ## Technologies Used
 
@@ -42,9 +85,12 @@ src/
 │   └── transaction.controller.js
 ├── middlewares
 │   └── auth.middleware.js
+│   └── logger.middleware.js
 ├── models
 │   ├── account.model.js
+│   └── idempotencyKey.model.js
 │   ├── ledger.model.js
+│   ├── outbox.model.js
 │   ├── tokenBlacklist.model.js
 │   ├── transaction.model.js
 │   └── user.model.js
@@ -53,13 +99,17 @@ src/
 │   ├── auth.routes.js
 │   └── transaction.routes.js
 ├── services
+│   ├── outbox/
 │   ├── idempotency.service.js
 │   ├── mail.service.js
 │   └── transaction.service.js
-└── utils
-    ├── dbTransaction.utils.js
-    └── token.utils.js
-
+├── utils
+│   ├── dbTransaction.utils.js
+│   └── hash.utils.js
+│   └── token.utils.js
+└── workers
+    ├── outbox.worker.js
+    └── startOutbox.worker.js
 app.js
 package.json
 server.js
