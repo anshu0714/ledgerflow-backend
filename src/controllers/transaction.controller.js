@@ -3,11 +3,13 @@ const {
   processTransfer,
   processInitialFunding,
 } = require("../services/transaction.service");
-const emailService = require("../services/mail.service");
 const handleIdempotentRequest = require("../services/idempotency.service");
 
 async function createTransaction(req, res) {
   const { fromAccount, toAccount, amount, idempotencyKey } = req.body;
+
+  const userEmail = req.user.email;
+  const userName = req.user.name;
 
   if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
     return res.status(400).json({ message: "Missing required fields" });
@@ -17,24 +19,18 @@ async function createTransaction(req, res) {
     idempotencyKey,
     payload: { fromAccount, toAccount, amount },
     handler: async () => {
-      return await processTransfer({ fromAccount, toAccount, amount });
+      return await processTransfer({
+        fromAccount,
+        toAccount,
+        amount,
+        userEmail,
+        userName,
+      });
     },
   });
 
   if (result.type === "ERROR") {
     return res.status(result.status).json({ message: result.message });
-  }
-
-  if (!result.isReplay) {
-    emailService
-      .transactionSuccessEmail(
-        req.user.name,
-        req.user.email,
-        amount,
-        fromAccount,
-        toAccount,
-      )
-      .catch((err) => console.error("Email failed:", err.message));
   }
 
   const statusCode = result.isReplay ? 200 : 201;

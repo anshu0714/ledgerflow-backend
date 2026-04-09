@@ -2,8 +2,15 @@ const Account = require("../models/account.model");
 const Transaction = require("../models/transaction.model");
 const Ledger = require("../models/ledger.model");
 const runInTransaction = require("../utils/dbTransaction.utils");
+const Outbox = require("../models/outbox.model");
 
-async function processTransfer({ fromAccount, toAccount, amount }) {
+async function processTransfer({
+  fromAccount,
+  toAccount,
+  amount,
+  userEmail,
+  userName,
+}) {
   return await runInTransaction(async (session) => {
     const [fromUser, toUser] = await Promise.all([
       Account.findById(fromAccount).session(session),
@@ -56,6 +63,23 @@ async function processTransfer({ fromAccount, toAccount, amount }) {
           account: toAccount,
           amount,
           transactionType: "CREDIT",
+        },
+      ],
+      { session },
+    );
+
+    await Outbox.create(
+      [
+        {
+          eventName: "TRANSACTION_SUCCESS",
+          payload: {
+            userName,
+            userEmail,
+            fromAccount,
+            toAccount,
+            amount,
+          },
+          status: "PENDING",
         },
       ],
       { session },

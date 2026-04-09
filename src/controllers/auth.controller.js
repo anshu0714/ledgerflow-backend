@@ -1,13 +1,13 @@
 const User = require("../models/user.model");
 const TokenBlacklist = require("../models/tokenBlacklist.model");
 const jwt = require("jsonwebtoken");
-const emailService = require("../services/mail.service");
 const {
   extractToken,
   setTokenCookie,
   generateToken,
-  isTokenBlacklisted,
 } = require("../utils/token.utils");
+const Outbox = require("../models/outbox.model");
+const runInTransaction = require("../utils/dbTransaction.utils");
 
 async function userRegisterController(req, res) {
   try {
@@ -27,10 +27,31 @@ async function userRegisterController(req, res) {
       });
     }
 
-    const user = await User.create({
-      email,
-      name,
-      password,
+    let user;
+
+    await runInTransaction(async (session) => {
+      console.log("Processed the user");
+      const [createdUser] = await User.create([{ email, name, password }], {
+        session,
+      });
+
+      user = createdUser;
+
+      const result = await Outbox.create(
+        [
+          {
+            eventName: "REGISTRATION_SUCCESS",
+            payload: {
+              userName: user.name,
+              userEmail: user.email,
+            },
+            status: "PENDING",
+          },
+        ],
+        { session },
+      );
+
+      console.log("Created outbox", result);
     });
 
     const token = generateToken(user._id);
@@ -46,10 +67,6 @@ async function userRegisterController(req, res) {
       },
       token: token,
     });
-
-    emailService
-      .userRegistrationEmail(user.name, user.email)
-      .catch((err) => console.log(err.msg));
   } catch (error) {
     console.log("Something went wrong: ", error);
 
