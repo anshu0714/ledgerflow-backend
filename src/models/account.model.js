@@ -9,6 +9,12 @@ const accountSchema = new mongoose.Schema(
       index: true,
       required: [true, "Account must be associated with a user!"],
     },
+    isSystemAccount: {
+      type: Boolean,
+      default: false,
+      index: true,
+      immutable: true,
+    },
     status: {
       type: String,
       enum: {
@@ -33,6 +39,7 @@ const accountSchema = new mongoose.Schema(
 );
 
 accountSchema.index({ user: 1, status: 1 });
+accountSchema.index({ user: 1, isSystemAccount: 1 });
 
 accountSchema.methods.getBalance = async function (options = {}) {
   const { session } = options;

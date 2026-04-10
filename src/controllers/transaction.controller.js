@@ -15,6 +15,28 @@ async function createTransaction(req, res) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
+  const account = await Account.findById(fromAccount);
+
+  if (!account) {
+    return res.status(404).json({ message: "From account not found" });
+  }
+
+  if (account.user.toString() !== req.user._id.toString()) {
+    return res.status(403).json({
+      message: "Unauthorized: You do not own this account",
+    });
+  }
+
+  const receiver = await Account.findById(toAccount);
+
+  if (!receiver) {
+    return res.status(404).json({ message: "Receiver account not found" });
+  }
+
+  if (receiver.status !== "ACTIVE") {
+    return res.status(400).json({ message: "Receiver account not active" });
+  }
+
   const result = await handleIdempotentRequest({
     idempotencyKey,
     payload: { fromAccount, toAccount, amount },
@@ -50,12 +72,23 @@ async function createInitialFundTransaction(req, res) {
 
   const systemAccount = await Account.findOne({
     user: req.user._id,
+    isSystemAccount: true,
   });
 
   if (!systemAccount) {
     return res.status(400).json({
       message: "System account not found",
     });
+  }
+
+  const receiver = await Account.findById(toAccount);
+
+  if (!receiver) {
+    return res.status(404).json({ message: "Receiver account not found" });
+  }
+
+  if (receiver.status !== "ACTIVE") {
+    return res.status(400).json({ message: "Receiver account not active" });
   }
 
   const result = await handleIdempotentRequest({
