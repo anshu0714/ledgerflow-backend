@@ -35,8 +35,15 @@ A production-grade backend system simulating fintech-level transaction reliabili
 
 ### System Reliability
 
-- Handles race conditions and partial failures
+- Handles race conditions, double-spend scenarios, and partial failures
 - Designed with production-grade backend patterns inspired by fintech systems
+
+### Concurrency-Safe Transactions
+
+- Implemented deterministic account locking using ordered writes inside MongoDB transactions
+- Prevents race conditions and double-spending under concurrent requests
+- Ensures consistent balance validation using post-lock computation
+- Mimics pessimistic locking behavior for financial-grade safety
 
 ## Architecture Highlights
 

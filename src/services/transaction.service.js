@@ -12,10 +12,31 @@ async function processTransfer({
   userName,
 }) {
   return await runInTransaction(async (session) => {
-    const [fromUser, toUser] = await Promise.all([
-      Account.findById(fromAccount).session(session),
-      Account.findById(toAccount).session(session),
-    ]);
+    const [firstId, secondId] = [fromAccount, toAccount].sort((a, b) =>
+      a.toString().localeCompare(b.toString()),
+    );
+
+    const firstAccount = await Account.findOneAndUpdate(
+      { _id: firstId },
+      { $set: { updatedAt: new Date() } },
+      { new: true, session },
+    );
+
+    const secondAccount = await Account.findOneAndUpdate(
+      { _id: secondId },
+      { $set: { updatedAt: new Date() } },
+      { new: true, session },
+    );
+
+    const fromUser =
+      firstId.toString() === fromAccount.toString()
+        ? firstAccount
+        : secondAccount;
+
+    const toUser =
+      firstId.toString() === toAccount.toString()
+        ? firstAccount
+        : secondAccount;
 
     if (!fromUser || !toUser) {
       throw new Error("Account not found");
