@@ -1,4 +1,5 @@
 const Account = require("../models/account.model");
+const cache = require("../utils/cache");
 
 async function createAccount(req, res) {
   try {
@@ -38,6 +39,16 @@ async function getUserAccounts(req, res) {
 async function getAccountBalance(req, res) {
   try {
     const { accountId } = req.params;
+    const cacheKey = `balance:${req.user._id}:${accountId}`;
+
+    const cachedBalance = cache.get(cacheKey);
+    if (cachedBalance !== undefined) {
+      return res.status(200).json({
+        message: "Balance fetched (cache)",
+        accountId,
+        balance: cachedBalance,
+      });
+    }
 
     const account = await Account.findOne({
       _id: accountId,
@@ -51,6 +62,8 @@ async function getAccountBalance(req, res) {
     }
 
     const balance = await account.getBalance();
+
+    cache.set(cacheKey, balance);
 
     return res.status(200).json({
       message: "Account balance fetched successfully!",

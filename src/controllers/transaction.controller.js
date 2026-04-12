@@ -1,4 +1,5 @@
 const Account = require("../models/account.model");
+const cache = require("../utils/cache");
 const {
   processTransfer,
   processInitialFunding,
@@ -11,6 +12,7 @@ async function createTransaction(req, res) {
 
   const userEmail = req.user.email;
   const userName = req.user.name;
+  const userId = req.user._id;
 
   if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
     return res.status(400).json({ message: "Missing required fields" });
@@ -22,7 +24,7 @@ async function createTransaction(req, res) {
     return res.status(404).json({ message: "From account not found" });
   }
 
-  if (account.user.toString() !== req.user._id.toString()) {
+  if (account.user.toString() !== userId.toString()) {
     return res.status(403).json({
       message: "Unauthorized: You do not own this account",
     });
@@ -56,6 +58,11 @@ async function createTransaction(req, res) {
     return res.status(result.status).json({ message: result.message });
   }
 
+  if (!result.isReplay) {
+    cache.del(`balance:${userId}:${fromAccount}`);
+    cache.del(`balance:${userId}:${toAccount}`);
+  }
+
   const statusCode = result.isReplay ? 200 : 201;
 
   return res.status(statusCode).json({
@@ -66,13 +73,14 @@ async function createTransaction(req, res) {
 
 async function createInitialFundTransaction(req, res) {
   const { toAccount, amount, idempotencyKey } = req.body;
+  const userId = req.user._id;
 
   if (!toAccount || !amount || !idempotencyKey) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
   const systemAccount = await Account.findOne({
-    user: req.user._id,
+    user: userId,
     isSystemAccount: true,
   });
 
@@ -112,7 +120,14 @@ async function createInitialFundTransaction(req, res) {
     return res.status(result.status).json({ message: result.message });
   }
 
-  return res.status(201).json({
+  if (!result.isReplay) {
+    cache.del(`balance:${userId}:${toAccount}`);
+    cache.del(`balance:${userId}:${systemAccount._id}`);
+  }
+
+  const statusCode = result.isReplay ? 200 : 201;
+
+  return res.status(statusCode).json({
     message: "Initial funding successful",
     transaction: result.data,
   });
