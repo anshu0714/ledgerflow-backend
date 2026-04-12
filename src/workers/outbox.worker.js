@@ -11,7 +11,7 @@ async function processOutboxEvents() {
       {
         $set: { lockedAt: new Date() },
       },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (!event) {

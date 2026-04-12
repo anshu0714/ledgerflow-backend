@@ -19,13 +19,13 @@ async function processTransfer({
     const firstAccount = await Account.findOneAndUpdate(
       { _id: firstId },
       { $set: { updatedAt: new Date() } },
-      { new: true, session },
+      { returnDocument: "after", session },
     );
 
     const secondAccount = await Account.findOneAndUpdate(
       { _id: secondId },
       { $set: { updatedAt: new Date() } },
-      { new: true, session },
+      { returnDocument: "after", session },
     );
 
     const fromUser =
