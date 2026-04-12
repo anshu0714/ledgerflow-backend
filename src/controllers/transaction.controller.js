@@ -4,6 +4,7 @@ const {
   processInitialFunding,
 } = require("../services/transaction.service");
 const handleIdempotentRequest = require("../services/idempotency.service");
+const Transaction = require("../models/transaction.model");
 
 async function createTransaction(req, res) {
   const { fromAccount, toAccount, amount, idempotencyKey } = req.body;
@@ -117,7 +118,54 @@ async function createInitialFundTransaction(req, res) {
   });
 }
 
+async function getTransactionHistory(req, res) {
+  try {
+    const { accountId, cursor, limit = 10 } = req.query;
+
+    if (!accountId) {
+      return res.status(400).json({ message: "accountId is required" });
+    }
+
+    const account = await Account.findOne({
+      _id: accountId,
+      user: req.user._id,
+    });
+
+    if (!account) {
+      return res.status(403).json({ message: "Unauthorized access" });
+    }
+
+    const query = {
+      $or: [{ fromAccount: accountId }, { toAccount: accountId }],
+    };
+
+    if (cursor) {
+      query.createdAt = { $lt: new Date(cursor) };
+    }
+
+    const parsedLimit = parseInt(limit, 10);
+    const safeLimit = Math.min(Math.max(parsedLimit || 10, 1), 50);
+
+    const transactions = await Transaction.find(query)
+      .sort({ createdAt: -1 })
+      .limit(safeLimit);
+
+    const nextCursor =
+      transactions.length > 0
+        ? transactions[transactions.length - 1].createdAt
+        : null;
+
+    return res.status(200).json({
+      data: transactions,
+      nextCursor,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+}
+
 module.exports = {
   createTransaction,
   createInitialFundTransaction,
+  getTransactionHistory,
 };

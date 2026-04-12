@@ -13,11 +13,11 @@ async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
     });
 
     const result = await handler();
-    record.resourceId = result._id;
-
     if (!result || !result._id) {
       throw new Error("Invalid transaction result");
     }
+
+    record.resourceId = result._id;
 
     record.status = "SUCCESS";
     record.response = result;

@@ -14,23 +14,19 @@ async function userRegisterController(req, res) {
     const { email, name, password } = req.body;
 
     if (!email || !name || !password) {
-      return res
-        .status(400)
-        .json({ message: "All fields are required", status: "failed" });
+      return res.status(400).json({ message: "All fields are required" });
     }
 
     const isUserExist = await User.findOne({ email });
     if (isUserExist) {
       return res.status(409).json({
         message: "User already exist with this email!",
-        status: "failed",
       });
     }
 
     let user;
 
     await runInTransaction(async (session) => {
-      console.log("Processed the user");
       const [createdUser] = await User.create([{ email, name, password }], {
         session,
       });
@@ -50,8 +46,6 @@ async function userRegisterController(req, res) {
         ],
         { session },
       );
-
-      console.log("Created outbox", result);
     });
 
     const token = generateToken(user._id);
@@ -68,8 +62,6 @@ async function userRegisterController(req, res) {
       token: token,
     });
   } catch (error) {
-    console.log("Something went wrong: ", error);
-
     if (error.name === "ValidationError") {
       const errors = {};
       for (let field in error.errors) {
@@ -79,14 +71,12 @@ async function userRegisterController(req, res) {
       return res.status(400).json({
         message: "User registration failed",
         errors,
-        status: "failed",
       });
     }
 
     if (error.code === 11000 && error.keyValue.email) {
       return res.status(409).json({
         message: "Email already in use",
-        status: "failed",
       });
     }
 
@@ -102,16 +92,13 @@ async function userLoginController(req, res) {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "All fields are required", status: "failed" });
+      return res.status(400).json({ message: "All fields are required" });
     }
 
     const user = await User.findOne({ email }).select("+password");
     if (!user) {
       return res.status(401).json({
         message: "Invalid Credentials",
-        status: "failed",
       });
     }
 
@@ -120,7 +107,6 @@ async function userLoginController(req, res) {
     if (!isPasswordValid) {
       return res.status(401).json({
         message: "Invalid Credentials",
-        status: "failed",
       });
     }
 
@@ -138,8 +124,6 @@ async function userLoginController(req, res) {
       token: token,
     });
   } catch (error) {
-    console.log("Something went wrong: ", error);
-
     res.status(500).json({
       message: "Something went wrong",
       error: error.message,

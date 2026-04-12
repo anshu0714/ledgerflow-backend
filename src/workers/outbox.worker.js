@@ -15,11 +15,8 @@ async function processOutboxEvents() {
     );
 
     if (!event) {
-      console.log("No events to process");
       break;
     }
-
-    console.log(`Processing event: ${event._id}`);
 
     try {
       await handleEvent(event);
@@ -29,11 +26,7 @@ async function processOutboxEvents() {
       event.lockedAt = null;
 
       await event.save();
-
-      console.log(`Event processed: ${event._id}`);
     } catch (err) {
-      console.log(`Event failed: ${event._id}`);
-
       event.retryCount += 1;
       event.lastError = err.message;
 

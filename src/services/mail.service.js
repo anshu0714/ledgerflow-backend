@@ -37,7 +37,7 @@ function sendEmail(to, subject, text, html) {
 }
 
 // Registration Email
-function userRegistrationEmail(userName, email) {
+function sendUserRegistrationEmail(userName, email) {
   const subject = "Your Ledgerflow Account Has Been Successfully Registered";
   const text = `Hi ${userName},
 
@@ -91,7 +91,7 @@ Ledgerflow Team`;
 }
 
 // Transaction Success Email
-async function transactionSuccessEmail(
+async function sendTransactionSuccessEmail(
   userName,
   email,
   amount,
@@ -151,13 +151,11 @@ Ledgerflow Team`;
 </body>
 </html>`;
 
-  setImmediate(() => {
-    sendEmail(email, subject, text, html);
-  });
+  sendEmail(email, subject, text, html);
 }
 
 // Transaction Failure Email
-async function transactionFailureEmail(
+async function sendTransactionFailureEmail(
   userName,
   email,
   amount,
@@ -221,13 +219,11 @@ Ledgerflow Team`;
 </body>
 </html>`;
 
-  setImmediate(() => {
-    sendEmail(email, subject, text, html);
-  });
+  sendEmail(email, subject, text, html);
 }
 
 module.exports = {
-  userRegistrationEmail,
-  transactionSuccessEmail,
-  transactionFailureEmail,
+  sendUserRegistrationEmail,
+  sendTransactionSuccessEmail,
+  sendTransactionFailureEmail,
 };

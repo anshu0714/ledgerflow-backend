@@ -25,20 +25,20 @@ const router = express.Router();
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [fromAccount, toAccount, amount, idempotencyKey]
  *             properties:
- *               accountId:
+ *               fromAccount:
  *                 type: string
- *               type:
+ *               toAccount:
  *                 type: string
  *               amount:
  *                 type: number
- *               description:
+ *               idempotencyKey:
  *                 type: string
  *     responses:
  *       201:
- *         description: Transaction created
+ *         description: Transaction created successfully
  */
-
 router.post(
   "/",
   authMiddleware.authenticate,
@@ -49,7 +49,7 @@ router.post(
  * @swagger
  * /api/transactions/system/initial-fund:
  *   post:
- *     summary: Create initial system fund (admin only)
+ *     summary: Create initial fund transaction
  *     tags: [Transactions]
  *     security:
  *       - bearerAuth: []
@@ -59,19 +59,56 @@ router.post(
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [toAccount, amount, idempotencyKey]
  *             properties:
- *               accountId:
+ *               toAccount:
  *                 type: string
  *               amount:
  *                 type: number
+ *               idempotencyKey:
+ *                 type: string
  *     responses:
  *       201:
- *         description: Initial fund created
+ *         description: Initial funding successful
  */
 router.post(
   "/system/initial-fund",
   authMiddleware.systemUserAuthenticate,
   transactionController.createInitialFundTransaction,
+);
+
+/**
+ * @swagger
+ * /api/transactions/history:
+ *   get:
+ *     summary: Get transaction history
+ *     tags: [Transactions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: accountId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: cursor
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Transaction history fetched successfully
+ */
+router.get(
+  "/history",
+  authMiddleware.authenticate,
+  transactionController.getTransactionHistory,
 );
 
 module.exports = router;

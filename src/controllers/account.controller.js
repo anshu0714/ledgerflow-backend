@@ -2,9 +2,15 @@ const Account = require("../models/account.model");
 
 async function createAccount(req, res) {
   try {
+    const { currency } = req.body;
+
+    if (!["INR", "USD", "EUR"].includes(currency)) {
+      return res.status(400).json({ message: "Invalid currency" });
+    }
+
     const account = await Account.create({
       user: req.user._id,
-      currency: req.body?.currency,
+      currency,
     });
 
     res.status(201).json({
@@ -12,7 +18,6 @@ async function createAccount(req, res) {
       account: account,
     });
   } catch (error) {
-    console.log(error);
     if (error.name === "ValidationError") {
       return res.status(400).json({ message: error.message });
     }
