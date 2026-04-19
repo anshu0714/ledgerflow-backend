@@ -1,5 +1,6 @@
 const Account = require("../models/account.model");
 const cache = require("../utils/cache");
+const { isRateLimited } = require("../utils/rateLimiter.utils");
 
 async function createAccount(req, res) {
   try {
@@ -40,6 +41,14 @@ async function getAccountBalance(req, res) {
   try {
     const { accountId } = req.params;
     const cacheKey = `balance:${req.user._id}:${accountId}`;
+
+    const key = `balance:${req.user._id}`;
+
+    if (isRateLimited(key, 30, 60 * 1000)) {
+      return res.status(429).json({
+        message: "Too many balance requests",
+      });
+    }
 
     const cachedBalance = cache.get(cacheKey);
     if (cachedBalance !== undefined) {

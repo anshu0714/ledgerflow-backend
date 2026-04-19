@@ -8,6 +8,7 @@ const {
 } = require("../utils/token.utils");
 const Outbox = require("../models/outbox.model");
 const runInTransaction = require("../utils/dbTransaction.utils");
+const { isRateLimited } = require("../utils/rateLimiter.utils");
 
 async function userRegisterController(req, res) {
   try {
@@ -15,6 +16,14 @@ async function userRegisterController(req, res) {
 
     if (!email || !name || !password) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const key = `register:${req.ip}`;
+
+    if (isRateLimited(key, 3, 60 * 1000)) {
+      return res.status(429).json({
+        message: "Too many registrations. Try later.",
+      });
     }
 
     const isUserExist = await User.findOne({ email });
@@ -93,6 +102,14 @@ async function userLoginController(req, res) {
 
     if (!email || !password) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const key = `login:${req.ip}:${email}`;
+
+    if (isRateLimited(key, 5, 60 * 1000)) {
+      return res.status(429).json({
+        message: "Too many login attempts. Try again later.",
+      });
     }
 
     const user = await User.findOne({ email }).select("+password");

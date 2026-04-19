@@ -6,6 +6,7 @@ const {
 } = require("../services/transaction.service");
 const handleIdempotentRequest = require("../services/idempotency.service");
 const Transaction = require("../models/transaction.model");
+const { isRateLimited } = require("../utils/rateLimiter.utils");
 
 async function createTransaction(req, res) {
   const { fromAccount, toAccount, amount, idempotencyKey } = req.body;
@@ -16,6 +17,14 @@ async function createTransaction(req, res) {
 
   if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
     return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  const key = `txn:${req.user._id}:${fromAccount}`;
+
+  if (isRateLimited(key, 10, 60 * 1000)) {
+    return res.status(429).json({
+      message: "Too many transactions. Please slow down.",
+    });
   }
 
   const account = await Account.findById(fromAccount);
@@ -79,6 +88,14 @@ async function createInitialFundTransaction(req, res) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
+  const key = `fund:${req.user._id}`;
+
+  if (isRateLimited(key, 5, 60 * 1000)) {
+    return res.status(429).json({
+      message: "Too many funding requests",
+    });
+  }
+
   const systemAccount = await Account.findOne({
     user: userId,
     isSystemAccount: true,
@@ -139,6 +156,14 @@ async function getTransactionHistory(req, res) {
 
     if (!accountId) {
       return res.status(400).json({ message: "accountId is required" });
+    }
+
+    const key = `history:${req.user._id}`;
+
+    if (isRateLimited(key, 20, 60 * 1000)) {
+      return res.status(429).json({
+        message: "Too many requests. Slow down.",
+      });
     }
 
     const account = await Account.findOne({

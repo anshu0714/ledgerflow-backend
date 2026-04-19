@@ -1,14 +1,16 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
-const cors = require("cors")
+const cors = require("cors");
 const authRoutes = require("./routes/auth.routes");
 const accountRoutes = require("./routes/account.routes");
 const transactionRoutes = require("./routes/transaction.routes");
 const logger = require("./middlewares/logger.middleware");
+const globalRateLimiter = require("./middlewares/rateLimiter.middleware");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
+app.use(globalRateLimiter);
 app.use(logger);
 app.use(cookieParser());
 
