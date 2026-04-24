@@ -1,17 +1,18 @@
-const logger = (req, res, next) => {
+const logger = require("../utils/logger");
+
+const requestLogger = (req, res, next) => {
   const start = Date.now();
 
   res.on("finish", () => {
-    const duration = Date.now() - start;
-
-    console.log(
-      `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${
-        res.statusCode
-      } - ${duration}ms`
-    );
+    logger.info("Request completed", {
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration: Date.now() - start,
+    });
   });
 
   next();
 };
 
-module.exports = logger;
+module.exports = requestLogger;

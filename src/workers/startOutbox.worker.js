@@ -1,13 +1,23 @@
 const processOutboxEvents = require("./outbox.worker");
+const logger = require("../utils/logger");
+const { randomUUID } = require("crypto");
 
 function startOutboxWorker() {
-  console.log("🚀 Outbox worker started...");
-
   setInterval(async () => {
+    const jobId = randomUUID();
+    const start = Date.now();
     try {
       await processOutboxEvents();
+
+      logger.info("Outbox job processed", {
+        jobId,
+        duration: Date.now() - start,
+      });
     } catch (err) {
-      console.error("❌ Worker error:", err.message);
+      logger.error("Outbox job failed", {
+        jobId,
+        error: err.message,
+      });
     }
   }, 15000);
 }

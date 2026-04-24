@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const logger = require("../utils/logger");
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -13,9 +14,11 @@ const transporter = nodemailer.createTransport({
 
 transporter.verify((error, success) => {
   if (error) {
-    console.log("Error connecting to email server: ", error.message);
+    logger.error("Email service connection failed", {
+      error: error.message,
+    });
   } else {
-    console.log("Email server is ready!", success);
+    logger.info("Email service ready");
   }
 });
 
@@ -29,10 +32,16 @@ function sendEmail(to, subject, text, html) {
       html,
     })
     .then((info) => {
-      console.log("Message sent:", info.messageId);
+      logger.info("Email sent", {
+        to,
+        messageId: info.messageId,
+      });
     })
     .catch((error) => {
-      console.log("Error sending email", error.message);
+      logger.error("Email sending failed", {
+        to,
+        error: error.message,
+      });
     });
 }
 
