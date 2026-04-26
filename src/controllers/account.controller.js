@@ -1,90 +1,82 @@
 const Account = require("../models/account.model");
 const cache = require("../utils/cache");
+const { success, error } = require("../utils/apiResponse.utils");
 const { isRateLimited } = require("../utils/rateLimiter.utils");
 
 async function createAccount(req, res) {
   try {
-    const { currency } = req.body;
-
-    if (!["INR", "USD", "EUR"].includes(currency)) {
-      return res.status(400).json({ message: "Invalid currency" });
-    }
-
     const account = await Account.create({
       user: req.user._id,
-      currency,
+      currency: req.body.currency,
     });
 
-    res.status(201).json({
-      message: "Account created successfully!",
-      account: account,
-    });
-  } catch (error) {
-    if (error.name === "ValidationError") {
-      return res.status(400).json({ message: error.message });
-    }
-    return res
-      .status(500)
-      .json({ message: "Something went wrong", error: error.message });
+    return success(res, { account }, "Account created successfully!", 201);
+  } catch (err) {
+    return error(res, err.message);
   }
 }
 
 async function getUserAccounts(req, res) {
-  const accounts = await Account.find({ user: req.user._id });
-  res.status(200).json({
-    message: "All accounts fetched successfully!",
-    accounts: accounts,
-  });
+  try {
+    const accounts = await Account.find({ user: req.user._id });
+
+    return success(res, { accounts }, "Accounts fetched successfully");
+  } catch (err) {
+    return error(res, err.message);
+  }
 }
 
 async function getAccountBalance(req, res) {
   try {
     const { accountId } = req.params;
-    const cacheKey = `balance:${req.user._id}:${accountId}`;
+    const userId = req.user._id;
 
-    const key = `balance:${req.user._id}`;
+    const cacheKey = `balance:${userId}:${accountId}`;
+    const rateKey = `balance:${userId}`;
 
-    if (isRateLimited(key, 30, 60 * 1000)) {
-      return res.status(429).json({
-        message: "Too many balance requests",
-      });
+    // Rate limit
+    if (isRateLimited(rateKey, 30, 60 * 1000)) {
+      return error(res, "Too many balance requests", 429);
     }
 
-    const cachedBalance = cache.get(cacheKey);
-    if (cachedBalance !== undefined) {
-      return res.status(200).json({
-        message: "Balance fetched (cache)",
-        accountId,
-        balance: cachedBalance,
-      });
+    // Cache check
+    const cached = cache.get(cacheKey);
+    if (cached !== undefined) {
+      return success(
+        res,
+        { accountId, balance: cached, cached: true },
+        "Balance fetched from cache",
+      );
     }
 
     const account = await Account.findOne({
       _id: accountId,
-      user: req.user._id,
+      user: userId,
     });
 
     if (!account) {
-      return res.status(404).json({
-        message: "Account Not Found!",
-      });
+      return error(res, "Account not found", 404);
     }
 
     const balance = await account.getBalance();
 
     cache.set(cacheKey, balance);
 
-    return res.status(200).json({
-      message: "Account balance fetched successfully!",
-      accountId: account._id,
-      balance,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      message: "Failed to fetch balance",
-      error: error.message,
-    });
+    return success(
+      res,
+      { accountId: account._id, balance },
+      "Balance fetched successfully",
+    );
+  } catch (err) {
+    if (err.name === "CastError") {
+      return error(res, "Invalid account ID", 400);
+    }
+    return error(res, "Failed to fetch balance");
   }
 }
 
-module.exports = { createAccount, getUserAccounts, getAccountBalance };
+module.exports = {
+  createAccount,
+  getUserAccounts,
+  getAccountBalance,
+};

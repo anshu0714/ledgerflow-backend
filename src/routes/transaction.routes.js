@@ -1,4 +1,9 @@
 const express = require("express");
+const validate = require("../middlewares/validate.middleware");
+const {
+  createTransactionSchema,
+  initialFundSchema,
+} = require("../validators/transaction.validator");
 const authMiddleware = require("../middlewares/auth.middleware");
 const transactionController = require("../controllers/transaction.controller");
 
@@ -42,6 +47,7 @@ const router = express.Router();
 router.post(
   "/",
   authMiddleware.authenticate,
+  validate(createTransactionSchema),
   transactionController.createTransaction,
 );
 
@@ -74,6 +80,7 @@ router.post(
 router.post(
   "/system/initial-fund",
   authMiddleware.systemUserAuthenticate,
+  validate(initialFundSchema),
   transactionController.createInitialFundTransaction,
 );
 

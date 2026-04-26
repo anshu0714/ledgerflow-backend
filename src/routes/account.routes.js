@@ -1,4 +1,6 @@
 const express = require("express");
+const validate = require("../middlewares/validate.middleware");
+const { createAccountSchema } = require("../validators/account.validator");
 const accountController = require("../controllers/account.controller");
 const authMiddleware = require("../middlewares/auth.middleware");
 
@@ -36,7 +38,12 @@ const router = express.Router();
  *       201:
  *         description: Account created
  */
-router.post("/", authMiddleware.authenticate, accountController.createAccount);
+router.post(
+  "/",
+  authMiddleware.authenticate,
+  validate(createAccountSchema),
+  accountController.createAccount,
+);
 
 /**
  * @swagger

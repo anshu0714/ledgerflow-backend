@@ -1,4 +1,6 @@
 const express = require("express");
+const validate = require("../middlewares/validate.middleware");
+const { registerSchema, loginSchema } = require("../validators/auth.validator");
 const authController = require("../controllers/auth.controller");
 
 const router = express.Router();
@@ -33,7 +35,11 @@ const router = express.Router();
  *       201:
  *         description: User registered
  */
-router.post("/register", authController.userRegisterController);
+router.post(
+  "/register",
+  validate(registerSchema),
+  authController.userRegisterController,
+);
 
 /**
  * @swagger
@@ -56,7 +62,11 @@ router.post("/register", authController.userRegisterController);
  *       200:
  *         description: User logged in, returns JWT
  */
-router.post("/login", authController.userLoginController);
+router.post(
+  "/login",
+  validate(loginSchema),
+  authController.userLoginController,
+);
 
 /**
  * @swagger
