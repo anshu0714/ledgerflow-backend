@@ -1,75 +1,63 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
 const { extractToken, isTokenBlacklisted } = require("../utils/token.utils");
+const { error } = require("../utils/apiResponse.utils");
 
 async function authenticate(req, res, next) {
-  let token = extractToken(req);
+  const token = extractToken(req);
 
   if (!token) {
-    return res.status(401).json({
-      message: "Unauthorized user, token is Missing!",
-    });
+    return error(res, "Unauthorized user, token is missing!", 401);
   }
 
   if (await isTokenBlacklisted(token)) {
-    return res.status(401).json({ message: "Token is blacklisted" });
+    return error(res, "Token is blacklisted", 401);
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
     const user = await User.findById(decoded.id).select("_id email name");
 
     if (!user) {
-      return res.status(401).json({
-        message: "User doesn't exist!",
-      });
+      return error(res, "User doesn't exist!", 401);
     }
-    req.user = user;
 
+    req.user = user;
     next();
-  } catch (error) {
-    return res.status(401).json({
-      message: "Unauthorized user, token is invalid!",
-    });
+  } catch (err) {
+    return error(res, "Unauthorized user, token is invalid!", 401);
   }
 }
 
 async function systemUserAuthenticate(req, res, next) {
-  let token = extractToken(req);
+  const token = extractToken(req);
 
   if (!token) {
-    return res.status(401).json({
-      message: "Unauthorized user, token is Missing!",
-    });
+    return error(res, "Unauthorized user, token is missing!", 401);
   }
 
   if (await isTokenBlacklisted(token)) {
-    return res.status(401).json({ message: "Token is blacklisted" });
+    return error(res, "Token is blacklisted", 401);
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
     const user = await User.findById(decoded.id).select("+systemUser");
 
     if (!user) {
-      return res.status(401).json({
-        message: "User doesn't exist!",
-      });
+      return error(res, "User doesn't exist!", 401);
     }
 
     if (!user.systemUser) {
-      return res.status(403).json({
-        message: "Forbidden access, not a system user!",
-      });
+      return error(res, "Forbidden access, not a system user!", 403);
     }
 
     req.user = user;
-
     next();
-  } catch (error) {
-    return res.status(401).json({
-      message: "Unauthorized user, token is invalid!",
-    });
+  } catch (err) {
+    return error(res, "Unauthorized user, token is invalid!", 401);
   }
 }
 

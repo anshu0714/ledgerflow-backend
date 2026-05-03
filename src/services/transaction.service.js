@@ -45,11 +45,7 @@ async function processTransfer({
     if (fromUser.status !== "ACTIVE" || toUser.status !== "ACTIVE") {
       throw new Error("Account not active");
     }
-
-    if (amount <= 0) {
-      throw new Error("Amount must be greater than zero");
-    }
-
+    
     // Derive balance
     const balance = await fromUser.getBalance({ session });
 

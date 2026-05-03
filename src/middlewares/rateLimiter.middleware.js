@@ -1,4 +1,5 @@
 const { isRateLimited } = require("../utils/rateLimiter.utils");
+const { error } = require("../utils/apiResponse.utils");
 
 function globalRateLimiter(req, res, next) {
   const LIMIT = 100;
@@ -14,9 +15,7 @@ function globalRateLimiter(req, res, next) {
     res.setHeader("X-RateLimit-Remaining", 0);
     res.setHeader("Retry-After", 60);
 
-    return res.status(429).json({
-      error: "Rate limit exceeded",
-      message: "Too many requests from this IP",
+    return error(res, "Too many requests from this IP", 429, {
       limit: LIMIT,
       window: "60 seconds",
       retryAfter: 60,

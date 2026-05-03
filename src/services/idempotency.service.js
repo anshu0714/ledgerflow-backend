@@ -84,7 +84,7 @@ async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
     return {
       type: "ERROR",
       status: 500,
-      message: error.message,
+      message: "Internal server error",
     };
   }
 }

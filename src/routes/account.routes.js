@@ -28,12 +28,9 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               currency:
  *                 type: string
- *               type:
- *                 type: string
- *               balance:
- *                 type: number
+ *                 enum: [INR, USD, EUR]
  *     responses:
  *       201:
  *         description: Account created
