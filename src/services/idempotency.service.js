@@ -1,6 +1,7 @@
 const IdempotencyKey = require("../models/idempotencyKey.model");
 const Transaction = require("../models/transaction.model");
 const hashRequest = require("../utils/hash.utils");
+const logger = require("../utils/logger");
 
 async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
   const requestHash = hashRequest(payload);
@@ -13,12 +14,12 @@ async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
     });
 
     const result = await handler();
+
     if (!result || !result._id) {
       throw new Error("Invalid transaction result");
     }
 
     record.resourceId = result._id;
-
     record.status = "SUCCESS";
     record.response = result;
     await record.save();
@@ -26,15 +27,27 @@ async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
     return { type: "SUCCESS", data: result, isReplay: false };
   } catch (error) {
     if (error.code === 11000) {
+      logger.info("Idempotency replay detected", {
+        key: idempotencyKey,
+      });
+
       const existing = await IdempotencyKey.findOne({
         key: idempotencyKey,
       });
 
       if (!existing) {
+        logger.error("Idempotency record missing after duplicate", {
+          key: idempotencyKey,
+        });
+
         return { type: "ERROR", status: 404, message: "Not found" };
       }
 
       if (existing.requestHash !== requestHash) {
+        logger.error("Idempotency key reused with different payload", {
+          key: idempotencyKey,
+        });
+
         return {
           type: "ERROR",
           status: 400,
@@ -47,14 +60,19 @@ async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
       }
 
       if (existing.status === "PROCESSING") {
+        logger.info("Idempotency still processing", {
+          key: idempotencyKey,
+        });
+
         if (existing.resourceId) {
           const transaction = await Transaction.findById(
             existing.resourceId,
           ).lean();
+
           if (transaction && transaction.status === "COMPLETED") {
             return {
               type: "SUCCESS",
-              data: transaction.toObject ? transaction.toObject() : transaction,
+              data: transaction,
               isReplay: true,
             };
           }
@@ -68,6 +86,10 @@ async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
       }
 
       if (existing.status === "FAILED") {
+        logger.error("Idempotency previous attempt failed", {
+          key: idempotencyKey,
+        });
+
         return {
           type: "ERROR",
           status: 409,
@@ -75,6 +97,11 @@ async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
         };
       }
     }
+
+    logger.error("Idempotency handler failed", {
+      key: idempotencyKey,
+      error: error.message,
+    });
 
     await IdempotencyKey.findOneAndUpdate(
       { key: idempotencyKey, status: "PROCESSING" },

@@ -7,163 +7,248 @@ const {
 const handleIdempotentRequest = require("../services/idempotency.service");
 const Transaction = require("../models/transaction.model");
 const { isRateLimited } = require("../utils/rateLimiter.utils");
+const { success, error } = require("../utils/apiResponse.utils");
+const logger = require("../utils/logger");
 
 async function createTransaction(req, res) {
-  const { fromAccount, toAccount, amount, idempotencyKey } = req.body;
+  try {
+    const { fromAccount, toAccount, amount, idempotencyKey } = req.body;
 
-  const userEmail = req.user.email;
-  const userName = req.user.name;
-  const userId = req.user._id;
+    const userEmail = req.user.email;
+    const userName = req.user.name;
+    const userId = req.user._id;
 
-  if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
-    return res.status(400).json({ message: "Missing required fields" });
-  }
+    if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
+      return error(res, "Missing required fields", 400);
+    }
 
-  const key = `txn:${req.user._id}:${fromAccount}`;
+    const key = `txn:${userId}:${fromAccount}`;
 
-  if (isRateLimited(key, 10, 60 * 1000)) {
-    return res.status(429).json({
-      message: "Too many transactions. Please slow down.",
-    });
-  }
-
-  const account = await Account.findById(fromAccount);
-
-  if (!account) {
-    return res.status(404).json({ message: "From account not found" });
-  }
-
-  if (account.user.toString() !== userId.toString()) {
-    return res.status(403).json({
-      message: "Unauthorized: You do not own this account",
-    });
-  }
-
-  const receiver = await Account.findById(toAccount);
-
-  if (!receiver) {
-    return res.status(404).json({ message: "Receiver account not found" });
-  }
-
-  if (receiver.status !== "ACTIVE") {
-    return res.status(400).json({ message: "Receiver account not active" });
-  }
-
-  const result = await handleIdempotentRequest({
-    idempotencyKey,
-    payload: { fromAccount, toAccount, amount },
-    handler: async () => {
-      return await processTransfer({
+    if (isRateLimited(key, 10, 60 * 1000)) {
+      logger.warn("Transaction rate limit exceeded", {
+        requestId: req.requestId,
+        userId,
         fromAccount,
-        toAccount,
-        amount,
-        userEmail,
-        userName,
       });
-    },
-  });
 
-  if (result.type === "ERROR") {
-    return res.status(result.status).json({ message: result.message });
+      return error(res, "Too many transactions. Please slow down.", 429);
+    }
+
+    const account = await Account.findById(fromAccount);
+
+    if (!account) {
+      logger.error("Transaction failed - from account not found", {
+        requestId: req.requestId,
+        userId,
+        fromAccount,
+      });
+
+      return error(res, "From account not found", 404);
+    }
+
+    if (account.user.toString() !== userId.toString()) {
+      logger.error("Transaction failed - unauthorized ownership", {
+        requestId: req.requestId,
+        userId,
+        fromAccount,
+      });
+
+      return error(res, "Unauthorized: You do not own this account", 403);
+    }
+
+    const receiver = await Account.findById(toAccount);
+
+    if (!receiver) {
+      logger.error("Transaction failed - receiver not found", {
+        requestId: req.requestId,
+        toAccount,
+      });
+
+      return error(res, "Receiver account not found", 404);
+    }
+
+    if (receiver.status !== "ACTIVE") {
+      logger.error("Transaction failed - receiver inactive", {
+        requestId: req.requestId,
+        toAccount,
+      });
+
+      return error(res, "Receiver account not active", 400);
+    }
+
+    const result = await handleIdempotentRequest({
+      idempotencyKey,
+      payload: { fromAccount, toAccount, amount },
+      handler: async () => {
+        return await processTransfer({
+          fromAccount,
+          toAccount,
+          amount,
+          userEmail,
+          userName,
+        });
+      },
+    });
+
+    if (result.type === "ERROR") {
+      logger.error("Transaction idempotency error", {
+        requestId: req.requestId,
+        userId,
+        message: result.message,
+      });
+
+      return error(res, result.message, result.status);
+    }
+
+    if (!result.isReplay) {
+      cache.del(`balance:${userId}:${fromAccount}`);
+      cache.del(`balance:${userId}:${toAccount}`);
+    }
+
+    const statusCode = result.isReplay ? 200 : 201;
+
+    return success(
+      res,
+      { transaction: result.data },
+      "Transaction successful",
+      statusCode,
+    );
+  } catch (err) {
+    logger.error("Transaction processing failed", {
+      requestId: req.requestId,
+      userId: req.user?._id,
+      error: err.message,
+      stack: err.stack,
+    });
+
+    return error(res, "Transaction failed");
   }
-
-  if (!result.isReplay) {
-    cache.del(`balance:${userId}:${fromAccount}`);
-    cache.del(`balance:${userId}:${toAccount}`);
-  }
-
-  const statusCode = result.isReplay ? 200 : 201;
-
-  return res.status(statusCode).json({
-    message: "Transaction successful",
-    transaction: result.data,
-  });
 }
 
+// INITIAL FUND
 async function createInitialFundTransaction(req, res) {
-  const { toAccount, amount, idempotencyKey } = req.body;
-  const userId = req.user._id;
+  try {
+    const { toAccount, amount, idempotencyKey } = req.body;
+    const userId = req.user._id;
 
-  if (!toAccount || !amount || !idempotencyKey) {
-    return res.status(400).json({ message: "Missing required fields" });
-  }
+    if (!toAccount || !amount || !idempotencyKey) {
+      return error(res, "Missing required fields", 400);
+    }
 
-  const key = `fund:${req.user._id}`;
+    const key = `fund:${userId}`;
 
-  if (isRateLimited(key, 5, 60 * 1000)) {
-    return res.status(429).json({
-      message: "Too many funding requests",
+    if (isRateLimited(key, 5, 60 * 1000)) {
+      logger.error("Initial funding rate limit exceeded", {
+        requestId: req.requestId,
+        userId,
+      });
+
+      return error(res, "Too many funding requests", 429);
+    }
+
+    const systemAccount = await Account.findOne({
+      user: userId,
+      isSystemAccount: true,
     });
-  }
 
-  const systemAccount = await Account.findOne({
-    user: userId,
-    isSystemAccount: true,
-  });
+    if (!systemAccount) {
+      logger.error("Initial funding failed - system account missing", {
+        requestId: req.requestId,
+        userId,
+      });
 
-  if (!systemAccount) {
-    return res.status(400).json({
-      message: "System account not found",
-    });
-  }
+      return error(res, "System account not found", 400);
+    }
 
-  const receiver = await Account.findById(toAccount);
+    const receiver = await Account.findById(toAccount);
 
-  if (!receiver) {
-    return res.status(404).json({ message: "Receiver account not found" });
-  }
+    if (!receiver) {
+      logger.error("Initial funding failed - receiver not found", {
+        requestId: req.requestId,
+        toAccount,
+      });
 
-  if (receiver.status !== "ACTIVE") {
-    return res.status(400).json({ message: "Receiver account not active" });
-  }
+      return error(res, "Receiver account not found", 404);
+    }
 
-  const result = await handleIdempotentRequest({
-    idempotencyKey,
-    payload: {
-      fromAccount: systemAccount._id,
-      toAccount,
-      amount,
-    },
-    handler: async () => {
-      return await processInitialFunding({
-        systemAccountId: systemAccount._id,
+    if (receiver.status !== "ACTIVE") {
+      logger.error("Initial funding failed - receiver inactive", {
+        requestId: req.requestId,
+        toAccount,
+      });
+
+      return error(res, "Receiver account not active", 400);
+    }
+
+    const result = await handleIdempotentRequest({
+      idempotencyKey,
+      payload: {
+        fromAccount: systemAccount._id,
         toAccount,
         amount,
+      },
+      handler: async () => {
+        return await processInitialFunding({
+          systemAccountId: systemAccount._id,
+          toAccount,
+          amount,
+        });
+      },
+    });
+
+    if (result.type === "ERROR") {
+      logger.error("Initial funding idempotency error", {
+        requestId: req.requestId,
+        userId,
+        message: result.message,
       });
-    },
-  });
 
-  if (result.type === "ERROR") {
-    return res.status(result.status).json({ message: result.message });
+      return error(res, result.message, result.status);
+    }
+
+    if (!result.isReplay) {
+      cache.del(`balance:${userId}:${toAccount}`);
+      cache.del(`balance:${userId}:${systemAccount._id}`);
+    }
+
+    const statusCode = result.isReplay ? 200 : 201;
+
+    return success(
+      res,
+      { transaction: result.data },
+      "Initial funding successful",
+      statusCode,
+    );
+  } catch (err) {
+    logger.error("Initial funding failed", {
+      requestId: req.requestId,
+      userId: req.user?._id,
+      error: err.message,
+      stack: err.stack,
+    });
+
+    return error(res, "Initial funding failed");
   }
-
-  if (!result.isReplay) {
-    cache.del(`balance:${userId}:${toAccount}`);
-    cache.del(`balance:${userId}:${systemAccount._id}`);
-  }
-
-  const statusCode = result.isReplay ? 200 : 201;
-
-  return res.status(statusCode).json({
-    message: "Initial funding successful",
-    transaction: result.data,
-  });
 }
 
+// TRANSACTION HISTORY
 async function getTransactionHistory(req, res) {
   try {
     const { accountId, cursor, limit = 10 } = req.query;
 
     if (!accountId) {
-      return res.status(400).json({ message: "accountId is required" });
+      return error(res, "accountId is required", 400);
     }
 
     const key = `history:${req.user._id}`;
 
     if (isRateLimited(key, 20, 60 * 1000)) {
-      return res.status(429).json({
-        message: "Too many requests. Slow down.",
+      logger.warn("History rate limit exceeded", {
+        requestId: req.requestId,
+        userId: req.user._id,
       });
+
+      return error(res, "Too many requests. Slow down.", 429);
     }
 
     const account = await Account.findOne({
@@ -172,7 +257,13 @@ async function getTransactionHistory(req, res) {
     });
 
     if (!account) {
-      return res.status(403).json({ message: "Unauthorized access" });
+      logger.error("History access unauthorized", {
+        requestId: req.requestId,
+        userId: req.user._id,
+        accountId,
+      });
+
+      return error(res, "Unauthorized access", 403);
     }
 
     const query = {
@@ -195,12 +286,16 @@ async function getTransactionHistory(req, res) {
         ? transactions[transactions.length - 1].createdAt
         : null;
 
-    return res.status(200).json({
-      data: transactions,
-      nextCursor,
+    return success(res, { transactions, nextCursor });
+  } catch (err) {
+    logger.error("Fetch transaction history failed", {
+      requestId: req.requestId,
+      userId: req.user?._id,
+      error: err.message,
+      stack: err.stack,
     });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
+
+    return error(res, "Failed to fetch transaction history");
   }
 }
 

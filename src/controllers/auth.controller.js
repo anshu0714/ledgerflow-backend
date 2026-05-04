@@ -12,6 +12,7 @@ const Outbox = require("../models/outbox.model");
 const runInTransaction = require("../utils/dbTransaction.utils");
 const { success, error } = require("../utils/apiResponse.utils");
 const { isRateLimited } = require("../utils/rateLimiter.utils");
+const logger = require("../utils/logger");
 
 async function userRegisterController(req, res) {
   try {
@@ -20,11 +21,22 @@ async function userRegisterController(req, res) {
     const key = `register:${req.ip}`;
 
     if (isRateLimited(key, 3, 60 * 1000)) {
+      logger.warn("Rate limit exceeded for registration", {
+        requestId: req.requestId,
+        ip: req.ip,
+        email,
+      });
+
       return error(res, "Too many registrations. Try later.", 429);
     }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      logger.info("Registration failed - email already exists", {
+        requestId: req.requestId,
+        email,
+      });
+
       return error(res, "Email already in use", 409);
     }
 
@@ -69,6 +81,13 @@ async function userRegisterController(req, res) {
       201,
     );
   } catch (err) {
+    logger.error("User registration failed", {
+      requestId: req.requestId,
+      email: req.body?.email,
+      error: err.message,
+      stack: err.stack,
+    });
+
     if (err.code === 11000) {
       return error(res, "Email already exists", 409);
     }
@@ -84,18 +103,35 @@ async function userLoginController(req, res) {
     const key = `login:${req.ip}:${email}`;
 
     if (isRateLimited(key, 5, 60 * 1000)) {
+      logger.warn("Rate limit exceeded for login", {
+        requestId: req.requestId,
+        ip: req.ip,
+        email,
+      });
+
       return error(res, "Too many login attempts", 429);
     }
 
     const user = await User.findOne({ email }).select("+password");
 
     if (!user) {
+      logger.info("Login failed - user not found", {
+        requestId: req.requestId,
+        email,
+      });
+
       return error(res, "Invalid credentials", 401);
     }
 
     const isValid = await user.comparePassword(password);
 
     if (!isValid) {
+      logger.info("Login failed - invalid password", {
+        requestId: req.requestId,
+        userId: user._id,
+        email,
+      });
+
       return error(res, "Invalid credentials", 401);
     }
 
@@ -115,6 +151,13 @@ async function userLoginController(req, res) {
       "Login successful",
     );
   } catch (err) {
+    logger.error("Login failed", {
+      requestId: req.requestId,
+      email: req.body?.email,
+      error: err.message,
+      stack: err.stack,
+    });
+
     return error(res, "Login failed");
   }
 }
@@ -130,6 +173,10 @@ async function userLogoutController(req, res) {
     const decoded = jwt.decode(token);
 
     if (!decoded || !decoded.exp) {
+      logger.error("Logout failed - invalid token structure", {
+        requestId: req.requestId,
+      });
+
       return error(res, "Invalid token", 400);
     }
 
@@ -142,6 +189,12 @@ async function userLogoutController(req, res) {
 
     return success(res, {}, "Logged out successfully");
   } catch (err) {
+    logger.error("Logout failed", {
+      requestId: req.requestId,
+      error: err.message,
+      stack: err.stack,
+    });
+
     return error(res, "Logout failed");
   }
 }

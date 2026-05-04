@@ -1,16 +1,30 @@
 const transactionHandler = require("./handlers/transaction.handler");
 const userHandler = require("./handlers/user.handler");
+const logger = require("../../utils/logger");
 
 async function handleEvent(event) {
-  switch (event.eventName) {
-    case "TRANSACTION_SUCCESS":
-      return transactionHandler(event.payload);
+  try {
+    switch (event.eventName) {
+      case "TRANSACTION_SUCCESS":
+        return await transactionHandler(event.payload);
 
-    case "REGISTRATION_SUCCESS":
-      return userHandler(event.payload);
+      case "REGISTRATION_SUCCESS":
+        return await userHandler(event.payload);
 
-    default:
-      throw new Error(`Unknown event type: ${event.eventName}`);
+      default:
+        logger.error("Unknown event type received", {
+          eventName: event.eventName,
+          eventId: event._id,
+        });
+        throw new Error(`Unknown event type: ${event.eventName}`);
+    }
+  } catch (err) {
+    logger.error("Event processing failed", {
+      eventName: event.eventName,
+      eventId: event._id,
+      error: err.message,
+    });
+    throw err;
   }
 }
 

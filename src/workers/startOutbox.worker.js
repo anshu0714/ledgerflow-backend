@@ -6,6 +6,7 @@ function startOutboxWorker() {
   setInterval(async () => {
     const jobId = randomUUID();
     const start = Date.now();
+
     try {
       await processOutboxEvents();
 
@@ -16,7 +17,9 @@ function startOutboxWorker() {
     } catch (err) {
       logger.error("Outbox job failed", {
         jobId,
+        duration: Date.now() - start,
         error: err.message,
+        stack: err.stack,
       });
     }
   }, 15000);

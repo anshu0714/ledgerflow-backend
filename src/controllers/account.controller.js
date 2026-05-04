@@ -2,6 +2,7 @@ const Account = require("../models/account.model");
 const cache = require("../utils/cache");
 const { success, error } = require("../utils/apiResponse.utils");
 const { isRateLimited } = require("../utils/rateLimiter.utils");
+const logger = require("../utils/logger");
 
 async function createAccount(req, res) {
   try {
@@ -12,7 +13,14 @@ async function createAccount(req, res) {
 
     return success(res, { account }, "Account created successfully!", 201);
   } catch (err) {
-    return error(res, err.message);
+    logger.error("Create account failed", {
+      requestId: req.requestId,
+      userId: req.user?._id,
+      error: err.message,
+      stack: err.stack,
+    });
+
+    return error(res, "Failed to create account");
   }
 }
 
@@ -22,7 +30,14 @@ async function getUserAccounts(req, res) {
 
     return success(res, { accounts }, "Accounts fetched successfully");
   } catch (err) {
-    return error(res, err.message);
+    logger.error("Fetch user accounts failed", {
+      requestId: req.requestId,
+      userId: req.user?._id,
+      error: err.message,
+      stack: err.stack,
+    });
+
+    return error(res, "Failed to fetch accounts");
   }
 }
 
@@ -36,6 +51,12 @@ async function getAccountBalance(req, res) {
 
     // Rate limit
     if (isRateLimited(rateKey, 30, 60 * 1000)) {
+      logger.warn("Rate limit exceeded for balance", {
+        requestId: req.requestId,
+        userId,
+        accountId,
+      });
+
       return error(res, "Too many balance requests", 429);
     }
 
@@ -55,6 +76,12 @@ async function getAccountBalance(req, res) {
     });
 
     if (!account) {
+      logger.error("Account not found", {
+        requestId: req.requestId,
+        userId,
+        accountId,
+      });
+
       return error(res, "Account not found", 404);
     }
 
@@ -68,9 +95,18 @@ async function getAccountBalance(req, res) {
       "Balance fetched successfully",
     );
   } catch (err) {
+    logger.error("Get account balance failed", {
+      requestId: req.requestId,
+      userId: req.user?._id,
+      accountId: req.params?.accountId,
+      error: err.message,
+      stack: err.stack,
+    });
+
     if (err.name === "CastError") {
       return error(res, "Invalid account ID", 400);
     }
+
     return error(res, "Failed to fetch balance");
   }
 }

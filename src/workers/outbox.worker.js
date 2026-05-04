@@ -1,5 +1,7 @@
 const Outbox = require("../models/outbox.model");
 const handleEvent = require("../services/outbox/eventDispatcher");
+const logger = require("../utils/logger");
+
 async function processOutboxEvents() {
   while (true) {
     const event = await Outbox.findOneAndUpdate(
@@ -21,6 +23,12 @@ async function processOutboxEvents() {
     try {
       await handleEvent(event);
 
+      logger.info("Outbox event processed", {
+        eventId: event._id,
+        eventName: event.eventName,
+        retryCount: event.retryCount,
+      });
+
       event.status = "PROCESSED";
       event.processedAt = new Date();
       event.lockedAt = null;
@@ -35,6 +43,14 @@ async function processOutboxEvents() {
       event.nextRetryAt = new Date(Date.now() + delay);
       event.status = "FAILED";
       event.lockedAt = null;
+
+      logger.error("Outbox event failed", {
+        eventId: event._id,
+        eventName: event.eventName,
+        retryCount: event.retryCount,
+        nextRetryAt: event.nextRetryAt,
+        error: err.message,
+      });
 
       await event.save();
     }

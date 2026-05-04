@@ -12,4 +12,5 @@ function log(level, message, meta = {}) {
 module.exports = {
   info: (msg, meta) => log("INFO", msg, meta),
   error: (msg, meta) => log("ERROR", msg, meta),
+  warn: (msg, meta) => log("WARN", msg, meta),
 };

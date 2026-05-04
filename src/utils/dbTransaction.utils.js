@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const logger = require("./logger");
 
 async function runInTransaction(work) {
   const session = await mongoose.startSession();
@@ -7,6 +8,12 @@ async function runInTransaction(work) {
     return await session.withTransaction(async () => {
       return await work(session);
     });
+  } catch (err) {
+    logger.error("Database transaction failed", {
+      error: err.message,
+      stack: err.stack,
+    });
+    throw err;
   } finally {
     await session.endSession();
   }
