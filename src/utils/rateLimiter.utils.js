@@ -18,8 +18,25 @@ function isRateLimited(key, limit, windowMs) {
   }
 
   timestamps.push(now);
-
   return false;
 }
 
-module.exports = { isRateLimited };
+function cleanupRateLimiter(windowMs = 60000) {
+  const now = Date.now();
+
+  for (const [key, timestamps] of requests.entries()) {
+    while (timestamps.length && now - timestamps[0] > windowMs) {
+      timestamps.shift();
+    }
+
+    if (timestamps.length === 0) {
+      requests.delete(key);
+    }
+  }
+}
+
+function size() {
+  return requests.size;
+}
+
+module.exports = { isRateLimited, cleanupRateLimiter, size };

@@ -79,13 +79,14 @@ async function createTransaction(req, res) {
     const result = await handleIdempotentRequest({
       idempotencyKey,
       payload: { fromAccount, toAccount, amount },
-      handler: async () => {
+      handler: async (session) => {
         return await processTransfer({
           fromAccount,
           toAccount,
           amount,
           userEmail,
           userName,
+          session,
         });
       },
     });
@@ -187,11 +188,12 @@ async function createInitialFundTransaction(req, res) {
         toAccount,
         amount,
       },
-      handler: async () => {
+      handler: async (session) => {
         return await processInitialFunding({
           systemAccountId: systemAccount._id,
           toAccount,
           amount,
+          session,
         });
       },
     });
