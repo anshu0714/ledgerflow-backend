@@ -5,13 +5,19 @@ async function transactionHandler(payload) {
   const { userName, userEmail, fromAccount, toAccount, amount } = payload;
 
   try {
-    await emailService.sendTransactionSuccessEmail(
+    const result = await emailService.sendTransactionSuccessEmail(
       userName,
       userEmail,
       amount,
       fromAccount,
       toAccount,
     );
+
+    if (!result || !result.messageId) {
+      throw new Error("Email not confirmed");
+    }
+
+    return result;
   } catch (err) {
     logger.error("Transaction email handler failed", {
       userEmail,

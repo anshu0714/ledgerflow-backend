@@ -1,5 +1,7 @@
 const express = require("express");
 const validate = require("../middlewares/validate.middleware");
+const validateQuery = require("../middlewares/validateQuery.middleware");
+const { historyQuerySchema } = require("../validators/history.validator");
 const {
   createTransactionSchema,
   initialFundSchema,
@@ -115,6 +117,7 @@ router.post(
 router.get(
   "/history",
   authMiddleware.authenticate,
+  validateQuery(historyQuerySchema),
   transactionController.getTransactionHistory,
 );
 

@@ -139,7 +139,7 @@ async function createInitialFundTransaction(req, res) {
     const key = `fund:${userId}`;
 
     if (isRateLimited(key, 5, 60 * 1000)) {
-      logger.error("Initial funding rate limit exceeded", {
+      logger.warn("Initial funding rate limit exceeded", {
         requestId: req.requestId,
         userId,
       });
@@ -236,11 +236,7 @@ async function createInitialFundTransaction(req, res) {
 // TRANSACTION HISTORY
 async function getTransactionHistory(req, res) {
   try {
-    const { accountId, cursor, limit = 10 } = req.query;
-
-    if (!accountId) {
-      return error(res, "accountId is required", 400);
-    }
+    const { accountId, cursor, limit } = req.query;
 
     const key = `history:${req.user._id}`;
 
@@ -276,12 +272,10 @@ async function getTransactionHistory(req, res) {
       query.createdAt = { $lt: new Date(cursor) };
     }
 
-    const parsedLimit = parseInt(limit, 10);
-    const safeLimit = Math.min(Math.max(parsedLimit || 10, 1), 50);
-
     const transactions = await Transaction.find(query)
       .sort({ createdAt: -1 })
-      .limit(safeLimit);
+      .limit(limit)
+      .lean();
 
     const nextCursor =
       transactions.length > 0

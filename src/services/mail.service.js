@@ -12,15 +12,16 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-transporter.verify((error) => {
-  if (error) {
+(async () => {
+  try {
+    await transporter.verify();
+    logger.info("Email service ready");
+  } catch (error) {
     logger.error("Email service connection failed", {
       error: error.message,
     });
-  } else {
-    logger.info("Email service ready");
   }
-});
+})();
 
 async function sendEmail(to, subject, text, html) {
   try {
