@@ -7,8 +7,22 @@ async function processOutboxEvents() {
     const event = await Outbox.findOneAndUpdate(
       {
         status: { $in: ["PENDING", "FAILED"] },
-        $or: [{ nextRetryAt: { $lte: new Date() } }, { nextRetryAt: null }],
-        lockedAt: null,
+
+        $and: [
+          {
+            $or: [{ nextRetryAt: { $lte: new Date() } }, { nextRetryAt: null }],
+          },
+          {
+            $or: [
+              { lockedAt: null },
+              {
+                lockedAt: {
+                  $lt: new Date(Date.now() - 60000),
+                },
+              },
+            ],
+          },
+        ],
       },
       {
         $set: { lockedAt: new Date() },

@@ -7,7 +7,8 @@ const createTransactionSchema = z.object({
 
   amount: z
     .number({ required_error: "Amount is required" })
-    .positive("Amount must be greater than 0"),
+    .positive("Amount must be greater than 0")
+    .max(1000000, "Amount exceeds allowed limit"),
 
   idempotencyKey: z
     .string({ required_error: "Idempotency key is required" })

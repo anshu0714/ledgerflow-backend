@@ -1,9 +1,15 @@
 const requests = new Map();
+const MAX_KEYS = 10000;
 
 function isRateLimited(key, limit, windowMs) {
   const now = Date.now();
 
   if (!requests.has(key)) {
+    if (requests.size > MAX_KEYS) {
+      const firstKey = requests.keys().next().value;
+      requests.delete(firstKey);
+    }
+
     requests.set(key, []);
   }
 

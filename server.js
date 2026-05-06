@@ -7,7 +7,7 @@ const {
   cleanupRateLimiter,
   size: rateLimiterSize,
 } = require("./src/utils/rateLimiter.utils");
-const { cleanupCache, size: cacheSize } = require("./src/utils/cache");
+const cache = require("./src/utils/cache");
 const logger = require("./src/utils/logger");
 
 const PORT = process.env.PORT || 3000;
@@ -27,9 +27,10 @@ const startServer = async () => {
     setInterval(() => {
       try {
         cleanupRateLimiter(60000);
-        cleanupCache();
-        logger.info("Cleanup ran", {
-          cacheSize: cacheSize(),
+        cache.cleanup();
+        logger.info("System health", {
+          memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+          cacheSize: cache.size(),
           rateLimiterSize: rateLimiterSize(),
         });
       } catch (err) {

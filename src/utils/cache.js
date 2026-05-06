@@ -1,49 +1,64 @@
-const cache = new Map();
-
-const MAX_SIZE = 1000;
-
-function get(key) {
-  const data = cache.get(key);
-  if (!data) return undefined;
-
-  if (Date.now() > data.expiry) {
-    cache.delete(key);
-    return undefined;
+class LRUCache {
+  constructor(maxSize = 1000) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
   }
 
-  return data.value;
-}
+  get(key) {
+    if (!this.cache.has(key)) return undefined;
 
-function set(key, value, ttl = 60000) {
-  if (cache.size >= MAX_SIZE) {
-    const firstKey = cache.keys().next().value;
-    cache.delete(firstKey);
+    const value = this.cache.get(key);
+
+    if (Date.now() > value.expiry) {
+      this.cache.delete(key);
+      return undefined;
+    }
+
+    this.cache.delete(key);
+    this.cache.set(key, value);
+
+    return value.value;
   }
 
-  const expiry = Date.now() + ttl;
-  cache.set(key, { value, expiry });
-}
+  set(key, value, ttl = 60000) {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
 
-function del(key) {
-  cache.delete(key);
-}
+    const expiry = Date.now() + ttl;
 
-function clear() {
-  cache.clear();
-}
+    this.cache.set(key, {
+      value,
+      expiry,
+    });
 
-function cleanupCache() {
-  const now = Date.now();
-
-  for (const [key, data] of cache.entries()) {
-    if (now > data.expiry) {
-      cache.delete(key);
+    if (this.cache.size > this.maxSize) {
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
     }
   }
+
+  del(key) {
+    this.cache.delete(key);
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+
+  cleanup() {
+    const now = Date.now();
+
+    for (const [key, value] of this.cache.entries()) {
+      if (now > value.expiry) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  size() {
+    return this.cache.size;
+  }
 }
 
-function size() {
-  return cache.size;
-}
-
-module.exports = { get, set, del, clear, cleanupCache, size };
+module.exports = new LRUCache(1000);
