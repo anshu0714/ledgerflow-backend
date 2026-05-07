@@ -1,7 +1,7 @@
 const Account = require("../models/account.model");
-const cache = require("../utils/cache");
+const { getCache, setCache } = require("../services/cache.service");
 const { success, error } = require("../utils/apiResponse.utils");
-const { isRateLimited } = require("../utils/rateLimiter.utils");
+const { isRateLimited } = require("../services/rateLimiter.service");
 const logger = require("../utils/logger");
 
 async function createAccount(req, res) {
@@ -50,7 +50,7 @@ async function getAccountBalance(req, res) {
     const rateKey = `balance:${userId}`;
 
     // Rate limit
-    if (isRateLimited(rateKey, 30, 60 * 1000)) {
+    if (await isRateLimited(rateKey, 20, 60)) {
       logger.warn("Rate limit exceeded for balance", {
         requestId: req.requestId,
         userId,
@@ -61,8 +61,8 @@ async function getAccountBalance(req, res) {
     }
 
     // Cache check
-    const cached = cache.get(cacheKey);
-    if (cached !== undefined) {
+    const cached = await getCache(cacheKey);
+    if (cached !== null && cached !== undefined) {
       return success(
         res,
         { accountId, balance: cached, cached: true },
@@ -87,7 +87,9 @@ async function getAccountBalance(req, res) {
 
     const balance = await account.getBalance();
 
-    cache.set(cacheKey, balance);
+    if (balance !== null && balance !== undefined) {
+      await setCache(cacheKey, balance, 60);
+    }
 
     return success(
       res,

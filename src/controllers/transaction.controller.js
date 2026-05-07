@@ -1,12 +1,12 @@
 const Account = require("../models/account.model");
-const cache = require("../utils/cache");
+const { deleteCache } = require("../services/cache.service");
 const {
   processTransfer,
   processInitialFunding,
 } = require("../services/transaction.service");
 const handleIdempotentRequest = require("../services/idempotency.service");
 const Transaction = require("../models/transaction.model");
-const { isRateLimited } = require("../utils/rateLimiter.utils");
+const { isRateLimited } = require("../services/rateLimiter.service");
 const { success, error } = require("../utils/apiResponse.utils");
 const logger = require("../utils/logger");
 
@@ -24,7 +24,7 @@ async function createTransaction(req, res) {
 
     const key = `txn:${userId}:${fromAccount}`;
 
-    if (isRateLimited(key, 10, 60 * 1000)) {
+    if (await isRateLimited(key, 5, 60)) {
       logger.warn("Transaction rate limit exceeded", {
         requestId: req.requestId,
         userId,
@@ -102,8 +102,8 @@ async function createTransaction(req, res) {
     }
 
     if (!result.isReplay) {
-      cache.del(`balance:${userId}:${fromAccount}`);
-      cache.del(`balance:${userId}:${toAccount}`);
+      await deleteCache(`balance:${userId}:${fromAccount}`);
+      await deleteCache(`balance:${userId}:${toAccount}`);
     }
 
     const statusCode = result.isReplay ? 200 : 201;
@@ -138,7 +138,7 @@ async function createInitialFundTransaction(req, res) {
 
     const key = `fund:${userId}`;
 
-    if (isRateLimited(key, 5, 60 * 1000)) {
+    if (await isRateLimited(key, 5, 60)) {
       logger.warn("Initial funding rate limit exceeded", {
         requestId: req.requestId,
         userId,
@@ -209,8 +209,8 @@ async function createInitialFundTransaction(req, res) {
     }
 
     if (!result.isReplay) {
-      cache.del(`balance:${userId}:${toAccount}`);
-      cache.del(`balance:${userId}:${systemAccount._id}`);
+      await deleteCache(`balance:${userId}:${toAccount}`);
+      await deleteCache(`balance:${userId}:${systemAccount._id}`);
     }
 
     const statusCode = result.isReplay ? 200 : 201;
@@ -240,7 +240,7 @@ async function getTransactionHistory(req, res) {
 
     const key = `history:${req.user._id}`;
 
-    if (isRateLimited(key, 20, 60 * 1000)) {
+    if (await isRateLimited(key, 30, 60)) {
       logger.warn("History rate limit exceeded", {
         requestId: req.requestId,
         userId: req.user._id,

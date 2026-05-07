@@ -11,7 +11,7 @@ const {
 const Outbox = require("../models/outbox.model");
 const runInTransaction = require("../utils/dbTransaction.utils");
 const { success, error } = require("../utils/apiResponse.utils");
-const { isRateLimited } = require("../utils/rateLimiter.utils");
+const { isRateLimited } = require("../services/rateLimiter.service");
 const logger = require("../utils/logger");
 
 async function userRegisterController(req, res) {
@@ -20,7 +20,7 @@ async function userRegisterController(req, res) {
 
     const key = `register:${req.ip}`;
 
-    if (isRateLimited(key, 3, 60 * 1000)) {
+    if (await isRateLimited(key, 3, 60)) {
       logger.warn("Rate limit exceeded for registration", {
         requestId: req.requestId,
         ip: req.ip,
@@ -102,7 +102,7 @@ async function userLoginController(req, res) {
 
     const key = `login:${req.ip}:${email}`;
 
-    if (isRateLimited(key, 5, 60 * 1000)) {
+    if (await isRateLimited(key, 5, 60)) {
       logger.warn("Rate limit exceeded for login", {
         requestId: req.requestId,
         ip: req.ip,

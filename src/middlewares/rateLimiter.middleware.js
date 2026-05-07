@@ -1,8 +1,8 @@
-const { isRateLimited } = require("../utils/rateLimiter.utils");
+const { isRateLimited } = require("../services/rateLimiter.service");
 const { error } = require("../utils/apiResponse.utils");
 const logger = require("../utils/logger");
 
-function globalRateLimiter(req, res, next) {
+async function globalRateLimiter(req, res, next) {
   const LIMIT = 100;
   const WINDOW_MS = 60 * 1000;
 
@@ -10,7 +10,7 @@ function globalRateLimiter(req, res, next) {
 
   res.setHeader("X-RateLimit-Limit", LIMIT);
 
-  const limited = isRateLimited(key, LIMIT, WINDOW_MS);
+  const limited = await isRateLimited(key, LIMIT, WINDOW_MS);
 
   if (limited) {
     logger.warn("Global rate limit exceeded", {

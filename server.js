@@ -1,13 +1,10 @@
 require("dotenv").config();
+
 const app = require("./src/app");
 const connectDB = require("./src/config/db");
+const { connectRedis } = require("./src/config/redis");
 const setupSwagger = require("./swagger");
 const startOutboxWorker = require("./src/workers/startOutbox.worker");
-const {
-  cleanupRateLimiter,
-  size: rateLimiterSize,
-} = require("./src/utils/rateLimiter.utils");
-const cache = require("./src/utils/cache");
 const logger = require("./src/utils/logger");
 
 const PORT = process.env.PORT || 3000;
@@ -15,6 +12,8 @@ const PORT = process.env.PORT || 3000;
 const startServer = async () => {
   try {
     await connectDB();
+
+    await connectRedis();
 
     setupSwagger(app);
 
@@ -25,19 +24,9 @@ const startServer = async () => {
     startOutboxWorker();
 
     setInterval(() => {
-      try {
-        cleanupRateLimiter(60000);
-        cache.cleanup();
-        logger.info("System health", {
-          memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-          cacheSize: cache.size(),
-          rateLimiterSize: rateLimiterSize(),
-        });
-      } catch (err) {
-        logger.error("Cleanup job failed", {
-          error: err.message,
-        });
-      }
+      logger.info("System health", {
+        memoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      });
     }, 15000);
 
     return server;
