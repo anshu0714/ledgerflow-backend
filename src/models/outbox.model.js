@@ -15,7 +15,7 @@ const outboxSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["PENDING", "PROCESSED", "FAILED"],
+      enum: ["PENDING", "PROCESSED", "FAILED", "DEAD_LETTER"],
       default: "PENDING",
       required: true,
       index: true,

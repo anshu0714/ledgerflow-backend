@@ -2,6 +2,8 @@ const Outbox = require("../models/outbox.model");
 const handleEvent = require("../services/outbox/eventDispatcher");
 const logger = require("../utils/logger");
 
+const MAX_RETRIES = 5;
+
 async function processOutboxEvents() {
   while (true) {
     const event = await Outbox.findOneAndUpdate(
@@ -51,22 +53,33 @@ async function processOutboxEvents() {
     } catch (err) {
       event.retryCount += 1;
       event.lastError = err.message;
-
-      const delay = Math.min(60000, Math.pow(2, event.retryCount) * 1000);
-
-      event.nextRetryAt = new Date(Date.now() + delay);
-      event.status = "FAILED";
       event.lockedAt = null;
 
-      logger.error("Outbox event failed", {
-        eventId: event._id,
-        eventName: event.eventName,
-        retryCount: event.retryCount,
-        nextRetryAt: event.nextRetryAt,
-        error: err.message,
-      });
+      if (event.retryCount >= MAX_RETRIES) {
+        event.status = "DEAD_LETTER";
 
-      await event.save();
+        logger.error("Outbox event moved to dead letter", {
+          eventId: event._id,
+          eventName: event.eventName,
+          retryCount: event.retryCount,
+          error: err.message,
+        });
+      } else {
+        const ONE_HOUR = 60 * 60 * 1000;
+
+        event.nextRetryAt = new Date(Date.now() + ONE_HOUR);
+        event.status = "FAILED";
+
+        logger.error("Outbox event failed", {
+          eventId: event._id,
+          eventName: event.eventName,
+          retryCount: event.retryCount,
+          nextRetryAt: event.nextRetryAt,
+          error: err.message,
+        });
+
+        await event.save();
+      }
     }
   }
 }

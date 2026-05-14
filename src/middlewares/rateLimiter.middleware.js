@@ -4,13 +4,14 @@ const logger = require("../utils/logger");
 
 async function globalRateLimiter(req, res, next) {
   const LIMIT = 100;
-  const WINDOW_MS = 60 * 1000;
+  const WINDOW_SEC = 60;
 
-  const key = `global:${req.ip}`;
+  const ip = req.ip.replace(/^::ffff:/, "");
+  const key = `global:${ip}`;
 
   res.setHeader("X-RateLimit-Limit", LIMIT);
 
-  const limited = await isRateLimited(key, LIMIT, WINDOW_MS);
+  const limited = await isRateLimited(key, LIMIT, WINDOW_SEC);
 
   if (limited) {
     logger.warn("Global rate limit exceeded", {

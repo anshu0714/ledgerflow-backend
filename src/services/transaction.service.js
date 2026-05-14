@@ -56,12 +56,11 @@ async function processTransfer({
     }
 
     // Derive balance
-    const balance = await fromUser.getBalance({ session });
 
-    if (balance < amount) {
+    if (fromUser.balance < amount) {
       logger.error("Transfer failed - insufficient funds", {
         fromAccount,
-        balance,
+        balance: fromUser.balance,
         attemptedAmount: amount,
       });
       throw new Error("Insufficient funds");
@@ -79,6 +78,13 @@ async function processTransfer({
       ],
       { session },
     );
+
+    // Balance update
+    fromUser.balance -= amount;
+    toUser.balance += amount;
+
+    await fromUser.save({ session });
+    await toUser.save({ session });
 
     // Ledger entries
     await Ledger.insertMany(
@@ -133,7 +139,12 @@ async function processTransfer({
   }
 }
 
-async function processInitialFunding({ systemAccountId, toAccount, amount, session }) {
+async function processInitialFunding({
+  systemAccountId,
+  toAccount,
+  amount,
+  session,
+}) {
   try {
     const systemAccount =
       await Account.findById(systemAccountId).session(session);
@@ -154,6 +165,16 @@ async function processInitialFunding({ systemAccountId, toAccount, amount, sessi
       throw new Error("Receiver account not active");
     }
 
+    if (systemAccount.balance < amount) {
+      logger.error("Initial funding failed - insufficient system funds", {
+        systemAccountId,
+        balance: systemAccount.balance,
+        attemptedAmount: amount,
+      });
+
+      throw new Error("Insufficient system funds");
+    }
+
     const [transaction] = await Transaction.create(
       [
         {
@@ -165,6 +186,12 @@ async function processInitialFunding({ systemAccountId, toAccount, amount, sessi
       ],
       { session },
     );
+
+    receiver.balance += amount;
+    systemAccount.balance -= amount;
+
+    await systemAccount.save({ session });
+    await receiver.save({ session });
 
     await Ledger.insertMany(
       [

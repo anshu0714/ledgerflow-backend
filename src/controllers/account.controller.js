@@ -85,7 +85,7 @@ async function getAccountBalance(req, res) {
       return error(res, "Account not found", 404);
     }
 
-    const balance = await account.getBalance();
+    const balance = account.balance;
 
     if (balance !== null && balance !== undefined) {
       await setCache(cacheKey, balance, 60);
