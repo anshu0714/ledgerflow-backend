@@ -12,7 +12,7 @@ const Outbox = require("../models/outbox.model");
 const runInTransaction = require("../utils/dbTransaction.utils");
 const { success, error } = require("../utils/apiResponse.utils");
 const { isRateLimited } = require("../services/rateLimiter.service");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 async function userRegisterController(req, res) {
   try {

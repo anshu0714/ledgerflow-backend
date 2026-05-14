@@ -1,5 +1,5 @@
 const processOutboxEvents = require("./outbox.worker");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 const { randomUUID } = require("crypto");
 
 function startOutboxWorker() {

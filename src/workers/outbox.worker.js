@@ -1,6 +1,6 @@
 const Outbox = require("../models/outbox.model");
 const handleEvent = require("../services/outbox/eventDispatcher");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 const MAX_RETRIES = 5;
 

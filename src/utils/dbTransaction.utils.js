@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const logger = require("./logger");
+const logger = require("./logger.utils");
 
 async function runInTransaction(work) {
   const session = await mongoose.startSession();

@@ -1,5 +1,5 @@
 const { error } = require("../utils/apiResponse.utils");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 const validate = (schema) => (req, res, next) => {
   const result = schema.safeParse(req.body);

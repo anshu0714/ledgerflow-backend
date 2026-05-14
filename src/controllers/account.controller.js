@@ -2,7 +2,7 @@ const Account = require("../models/account.model");
 const { getCache, setCache } = require("../services/cache.service");
 const { success, error } = require("../utils/apiResponse.utils");
 const { isRateLimited } = require("../services/rateLimiter.service");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 async function createAccount(req, res) {
   try {

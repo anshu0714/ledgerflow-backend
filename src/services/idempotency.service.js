@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const IdempotencyKey = require("../models/idempotencyKey.model");
 const hashRequest = require("../utils/hash.utils");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 async function handleIdempotentRequest({ idempotencyKey, payload, handler }) {
   const requestHash = hashRequest(payload);

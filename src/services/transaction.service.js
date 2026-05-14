@@ -2,7 +2,7 @@ const Account = require("../models/account.model");
 const Transaction = require("../models/transaction.model");
 const Ledger = require("../models/ledger.model");
 const Outbox = require("../models/outbox.model");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 async function processTransfer({
   fromAccount,

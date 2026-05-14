@@ -1,5 +1,5 @@
 const { redisClient } = require("../config/redis");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 async function getCache(key) {
   try {

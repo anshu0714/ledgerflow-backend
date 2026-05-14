@@ -1,6 +1,6 @@
 const transactionHandler = require("./handlers/transaction.handler");
 const userHandler = require("./handlers/user.handler");
-const logger = require("../../utils/logger");
+const logger = require("../../utils/logger.utils");
 
 async function handleEvent(event) {
   try {

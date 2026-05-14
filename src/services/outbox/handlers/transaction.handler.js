@@ -1,5 +1,5 @@
 const emailService = require("../../mail.service");
-const logger = require("../../../utils/logger");
+const logger = require("../../../utils/logger.utils");
 
 async function transactionHandler(payload) {
   const { userName, userEmail, fromAccount, toAccount, amount } = payload;

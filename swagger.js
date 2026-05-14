@@ -1,6 +1,6 @@
 const swaggerJsDoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
-const logger = require("./src/utils/logger");
+const logger = require("./src/utils/logger.utils");
 
 // Basic Swagger definition
 const swaggerDefinition = {

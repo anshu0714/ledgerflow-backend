@@ -5,7 +5,7 @@ const connectDB = require("./src/config/db");
 const { connectRedis } = require("./src/config/redis");
 const setupSwagger = require("./swagger");
 const startOutboxWorker = require("./src/workers/startOutbox.worker");
-const logger = require("./src/utils/logger");
+const logger = require("./src/utils/logger.utils");
 
 const PORT = process.env.PORT || 3000;
 
@@ -13,7 +13,11 @@ const startServer = async () => {
   try {
     await connectDB();
 
-    await connectRedis();
+    const redisConnected = await connectRedis();
+
+    if (!redisConnected) {
+      logger.warn("Application started without Redis support");
+    }
 
     setupSwagger(app);
 

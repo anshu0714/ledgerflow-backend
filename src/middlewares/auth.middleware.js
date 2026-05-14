@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
 const { extractToken, isTokenBlacklisted } = require("../utils/token.utils");
 const { error } = require("../utils/apiResponse.utils");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 async function authenticate(req, res, next) {
   const token = extractToken(req);

@@ -1,6 +1,6 @@
 const { isRateLimited } = require("../services/rateLimiter.service");
 const { error } = require("../utils/apiResponse.utils");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 async function globalRateLimiter(req, res, next) {
   const LIMIT = 100;

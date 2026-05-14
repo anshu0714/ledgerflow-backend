@@ -1,13 +1,20 @@
 const { createClient } = require("redis");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
+
+const MAX_RETRIES = 5;
 
 const redisClient = createClient({
   url: process.env.REDIS_URL,
+
+  socket: {
+    reconnectStrategy: false,
+    connectTimeout: 5000,
+  },
 });
 
 redisClient.on("error", (err) => {
   logger.error("Redis error", {
-    error: err.message,
+    error: err.message || "Unknown Redis error",
   });
 });
 
@@ -16,7 +23,29 @@ redisClient.on("connect", () => {
 });
 
 async function connectRedis() {
-  await redisClient.connect();
+  for (let retry = 1; retry <= MAX_RETRIES; retry++) {
+    try {
+      await redisClient.connect();
+
+      logger.info("Redis connection established");
+
+      return true;
+    } catch (err) {
+      logger.error("Redis connection failed", {
+        retry,
+        maxRetries: MAX_RETRIES,
+        error: err.message,
+      });
+
+      if (retry < MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+    }
+  }
+
+  logger.warn("Redis unavailable - continuing without Redis");
+
+  return false;
 }
 
 module.exports = {

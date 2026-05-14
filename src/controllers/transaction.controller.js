@@ -8,7 +8,7 @@ const handleIdempotentRequest = require("../services/idempotency.service");
 const Transaction = require("../models/transaction.model");
 const { isRateLimited } = require("../services/rateLimiter.service");
 const { success, error } = require("../utils/apiResponse.utils");
-const logger = require("../utils/logger");
+const logger = require("../utils/logger.utils");
 
 async function createTransaction(req, res) {
   try {
