@@ -27,6 +27,13 @@ const transactionSchema = new mongoose.Schema(
       },
       default: "PENDING",
     },
+    referenceId: {
+      type: String,
+      required: true,
+      unique: true,
+      immutable: true,
+      index: true,
+    },
   },
   { timestamps: true },
 );

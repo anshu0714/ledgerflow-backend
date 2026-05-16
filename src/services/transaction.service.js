@@ -3,6 +3,7 @@ const Transaction = require("../models/transaction.model");
 const Ledger = require("../models/ledger.model");
 const Outbox = require("../models/outbox.model");
 const logger = require("../utils/logger.utils");
+const { randomUUID } = require("crypto");
 
 async function processTransfer({
   fromAccount,
@@ -13,6 +14,17 @@ async function processTransfer({
   session,
 }) {
   try {
+    const numericAmount = Number(amount);
+
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      throw new Error("Invalid transfer amount");
+    }
+
+    if (fromAccount.toString() === toAccount.toString()) {
+      throw new Error("Cannot transfer to same account");
+    }
+
+    // Deterministic lock ordering
     const [firstId, secondId] = [fromAccount, toAccount].sort((a, b) =>
       a.toString().localeCompare(b.toString()),
     );
@@ -44,6 +56,7 @@ async function processTransfer({
         fromAccount,
         toAccount,
       });
+
       throw new Error("Account not found");
     }
 
@@ -52,17 +65,18 @@ async function processTransfer({
         fromAccount,
         toAccount,
       });
+
       throw new Error("Account not active");
     }
 
-    // Derive balance
-
-    if (fromUser.balance < amount) {
+    // Balance validation
+    if (fromUser.balance < numericAmount) {
       logger.error("Transfer failed - insufficient funds", {
         fromAccount,
         balance: fromUser.balance,
-        attemptedAmount: amount,
+        attemptedAmount: numericAmount,
       });
+
       throw new Error("Insufficient funds");
     }
 
@@ -72,33 +86,54 @@ async function processTransfer({
         {
           fromAccount,
           toAccount,
-          amount,
+          amount: numericAmount,
           status: "PENDING",
+          referenceId: randomUUID(),
         },
       ],
       { session },
     );
 
-    // Balance update
-    fromUser.balance -= amount;
-    toUser.balance += amount;
+    logger.info("Transaction created", {
+      referenceId: transaction.referenceId,
+      transactionId: transaction._id,
+    });
 
-    await fromUser.save({ session });
-    await toUser.save({ session });
+    // Safe balance derivation
+    const updatedBalance = Number(fromUser.balance) - numericAmount;
 
-    // Ledger entries
+    if (updatedBalance < 0) {
+      throw new Error("Insufficient funds");
+    }
+
+    fromUser.balance = updatedBalance;
+    toUser.balance += numericAmount;
+
+    // Optimistic concurrency protection
+    try {
+      await fromUser.save({ session });
+      await toUser.save({ session });
+    } catch (err) {
+      if (err.name === "VersionError") {
+        throw new Error("Concurrent balance update detected");
+      }
+
+      throw err;
+    }
+
+    // Immutable ledger entries
     await Ledger.insertMany(
       [
         {
           transaction: transaction._id,
           account: fromAccount,
-          amount,
+          amount: numericAmount,
           transactionType: "DEBIT",
         },
         {
           transaction: transaction._id,
           account: toAccount,
-          amount,
+          amount: numericAmount,
           transactionType: "CREDIT",
         },
       ],
@@ -111,11 +146,12 @@ async function processTransfer({
         {
           eventName: "TRANSACTION_SUCCESS",
           payload: {
+            referenceId: transaction.referenceId,
             userName,
             userEmail,
             fromAccount,
             toAccount,
-            amount,
+            amount: numericAmount,
           },
           status: "PENDING",
         },
@@ -124,6 +160,7 @@ async function processTransfer({
     );
 
     transaction.status = "COMPLETED";
+
     await transaction.save({ session });
 
     return transaction;
@@ -132,9 +169,11 @@ async function processTransfer({
       fromAccount,
       toAccount,
       amount,
+      referenceId: err?.referenceId,
       error: err.message,
       stack: err.stack,
     });
+
     throw err;
   }
 }
@@ -146,8 +185,15 @@ async function processInitialFunding({
   session,
 }) {
   try {
+    const numericAmount = Number(amount);
+
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      throw new Error("Invalid funding amount");
+    }
+
     const systemAccount =
       await Account.findById(systemAccountId).session(session);
+
     const receiver = await Account.findById(toAccount).session(session);
 
     if (!systemAccount || !receiver) {
@@ -155,6 +201,7 @@ async function processInitialFunding({
         systemAccountId,
         toAccount,
       });
+
       throw new Error("Account not found");
     }
 
@@ -162,14 +209,15 @@ async function processInitialFunding({
       logger.error("Initial funding failed - receiver inactive", {
         toAccount,
       });
+
       throw new Error("Receiver account not active");
     }
 
-    if (systemAccount.balance < amount) {
+    if (systemAccount.balance < numericAmount) {
       logger.error("Initial funding failed - insufficient system funds", {
         systemAccountId,
         balance: systemAccount.balance,
-        attemptedAmount: amount,
+        attemptedAmount: numericAmount,
       });
 
       throw new Error("Insufficient system funds");
@@ -180,31 +228,51 @@ async function processInitialFunding({
         {
           fromAccount: systemAccount._id,
           toAccount,
-          amount,
+          amount: numericAmount,
           status: "PENDING",
+          referenceId: randomUUID(),
         },
       ],
       { session },
     );
 
-    receiver.balance += amount;
-    systemAccount.balance -= amount;
+    logger.info("Initial funding transaction created", {
+      referenceId: transaction.referenceId,
+      transactionId: transaction._id,
+    });
 
-    await systemAccount.save({ session });
-    await receiver.save({ session });
+    const updatedSystemBalance = Number(systemAccount.balance) - numericAmount;
+
+    if (updatedSystemBalance < 0) {
+      throw new Error("Insufficient system funds");
+    }
+
+    systemAccount.balance = updatedSystemBalance;
+    receiver.balance += numericAmount;
+
+    try {
+      await systemAccount.save({ session });
+      await receiver.save({ session });
+    } catch (err) {
+      if (err.name === "VersionError") {
+        throw new Error("Concurrent balance update detected");
+      }
+
+      throw err;
+    }
 
     await Ledger.insertMany(
       [
         {
           transaction: transaction._id,
           account: systemAccount._id,
-          amount,
+          amount: numericAmount,
           transactionType: "DEBIT",
         },
         {
           transaction: transaction._id,
           account: receiver._id,
-          amount,
+          amount: numericAmount,
           transactionType: "CREDIT",
         },
       ],
@@ -212,6 +280,7 @@ async function processInitialFunding({
     );
 
     transaction.status = "COMPLETED";
+
     await transaction.save({ session });
 
     return transaction;
@@ -223,6 +292,7 @@ async function processInitialFunding({
       error: err.message,
       stack: err.stack,
     });
+
     throw err;
   }
 }
