@@ -5,6 +5,7 @@ const {
   processInitialFunding,
 } = require("../services/transaction.service");
 const handleIdempotentRequest = require("../services/idempotency.service");
+const getOutboxQueue = require("../queues/outbox.queue");
 const Transaction = require("../models/transaction.model");
 const { isRateLimited } = require("../services/rateLimiter.service");
 const { success, error } = require("../utils/apiResponse.utils");
@@ -102,6 +103,31 @@ async function createTransaction(req, res) {
     }
 
     if (!result.isReplay) {
+      if (result.data.outboxEventId) {
+        try {
+          const outboxQueue = getOutboxQueue();
+
+          if (outboxQueue) {
+            await outboxQueue.add(
+              "transaction-email",
+              {
+                outboxId: result.data.outboxEventId,
+              },
+              {
+                jobId: result.data.outboxEventId,
+              },
+            );
+          } else {
+            logger.warn("Queue unavailable");
+          }
+        } catch (err) {
+          logger.error("Queue enqueue failed", {
+            outboxEventId: result.data.outboxEventId,
+            error: err.message,
+          });
+        }
+      }
+
       await deleteCache(`balance:${userId}:${fromAccount}`);
       await deleteCache(`balance:${userId}:${toAccount}`);
     }
@@ -110,7 +136,7 @@ async function createTransaction(req, res) {
 
     return success(
       res,
-      { transaction: result.data },
+      { transaction: result.data.transaction },
       "Transaction successful",
       statusCode,
     );
@@ -209,6 +235,31 @@ async function createInitialFundTransaction(req, res) {
     }
 
     if (!result.isReplay) {
+      if (result.data.outboxEventId) {
+        try {
+          const outboxQueue = getOutboxQueue();
+
+          if (outboxQueue) {
+            await outboxQueue.add(
+              "transaction-email",
+              {
+                outboxId: result.data.outboxEventId,
+              },
+              {
+                jobId: result.data.outboxEventId,
+              },
+            );
+          } else {
+            logger.warn("Queue unavailable");
+          }
+        } catch (err) {
+          logger.error("Queue enqueue failed", {
+            outboxEventId: result.data.outboxEventId,
+            error: err.message,
+          });
+        }
+      }
+
       await deleteCache(`balance:${userId}:${toAccount}`);
       await deleteCache(`balance:${userId}:${systemAccount._id}`);
     }
@@ -217,7 +268,7 @@ async function createInitialFundTransaction(req, res) {
 
     return success(
       res,
-      { transaction: result.data },
+      { transaction: result.data.transaction },
       "Initial funding successful",
       statusCode,
     );

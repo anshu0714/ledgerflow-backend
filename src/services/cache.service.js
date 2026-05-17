@@ -3,6 +3,10 @@ const logger = require("../utils/logger.utils");
 
 async function getCache(key) {
   try {
+    if (!redisClient.isOpen) {
+      return null;
+    }
+
     const value = await redisClient.get(key);
 
     return value ? JSON.parse(value) : null;
@@ -18,6 +22,10 @@ async function getCache(key) {
 
 async function setCache(key, value, ttl = 60) {
   try {
+    if (!redisClient.isOpen) {
+      return;
+    }
+
     await redisClient.setEx(key, ttl, JSON.stringify(value));
   } catch (err) {
     logger.error("Redis cache set failed", {
@@ -29,6 +37,10 @@ async function setCache(key, value, ttl = 60) {
 
 async function deleteCache(key) {
   try {
+    if (!redisClient.isOpen) {
+      return;
+    }
+
     await redisClient.del(key);
   } catch (err) {
     logger.error("Redis cache delete failed", {

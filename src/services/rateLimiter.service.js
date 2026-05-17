@@ -3,6 +3,10 @@ const logger = require("../utils/logger.utils");
 
 async function isRateLimited(key, limit, windowSec) {
   try {
+    if (!redisClient.isOpen) {
+      return false;
+    }
+
     const count = await redisClient.incr(key);
 
     if (count === 1) {

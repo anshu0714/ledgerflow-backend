@@ -140,8 +140,10 @@ async function processTransfer({
       { session },
     );
 
+    let outboxEventId;
+
     // Outbox event
-    await Outbox.create(
+    const [outboxEvent] = await Outbox.create(
       [
         {
           eventName: "TRANSACTION_SUCCESS",
@@ -159,11 +161,16 @@ async function processTransfer({
       { session },
     );
 
+    outboxEventId = outboxEvent._id.toString();
+
     transaction.status = "COMPLETED";
 
     await transaction.save({ session });
 
-    return transaction;
+    return {
+      transaction,
+      outboxEventId,
+    };
   } catch (err) {
     logger.error("processTransfer failed", {
       fromAccount,
@@ -279,11 +286,36 @@ async function processInitialFunding({
       { session },
     );
 
+    let outboxEventId;
+
+    const [outboxEvent] = await Outbox.create(
+      [
+        {
+          eventName: "TRANSACTION_SUCCESS",
+          payload: {
+            referenceId: transaction.referenceId,
+            userName: "System",
+            userEmail: null,
+            fromAccount: systemAccount._id,
+            toAccount,
+            amount: numericAmount,
+          },
+          status: "PENDING",
+        },
+      ],
+      { session },
+    );
+
+    outboxEventId = outboxEvent._id.toString();
+
     transaction.status = "COMPLETED";
 
     await transaction.save({ session });
 
-    return transaction;
+    return {
+      transaction,
+      outboxEventId,
+    };
   } catch (err) {
     logger.error("processInitialFunding failed", {
       systemAccountId,

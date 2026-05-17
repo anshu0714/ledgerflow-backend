@@ -3,8 +3,8 @@ require("dotenv").config();
 const app = require("./src/app");
 const connectDB = require("./src/config/db");
 const { connectRedis } = require("./src/config/redis");
+const recoverOutboxJobs = require("./src/workers/outboxRecovery.worker");
 const setupSwagger = require("./swagger");
-const startOutboxWorker = require("./src/workers/startOutbox.worker");
 const logger = require("./src/utils/logger.utils");
 
 const PORT = process.env.PORT || 3000;
@@ -15,6 +15,14 @@ const startServer = async () => {
 
     const redisConnected = await connectRedis();
 
+    if (redisConnected) {
+      require("./src/workers/outboxQueue.worker");
+
+      logger.info("BullMQ worker started");
+
+      setInterval(recoverOutboxJobs, 30000);
+    }
+
     if (!redisConnected) {
       logger.warn("Application started without Redis support");
     }
@@ -24,8 +32,6 @@ const startServer = async () => {
     const server = app.listen(PORT, () => {
       logger.info("Server started", { port: PORT });
     });
-
-    startOutboxWorker();
 
     setInterval(() => {
       logger.info("System health", {

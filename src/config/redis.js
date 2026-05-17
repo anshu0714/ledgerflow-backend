@@ -3,14 +3,16 @@ const logger = require("../utils/logger.utils");
 
 const MAX_RETRIES = 5;
 
-const redisClient = createClient({
+const redisConfig = {
   url: process.env.REDIS_URL,
 
   socket: {
     reconnectStrategy: false,
     connectTimeout: 5000,
   },
-});
+};
+
+const redisClient = createClient(redisConfig);
 
 redisClient.on("error", (err) => {
   logger.error("Redis error", {
@@ -50,5 +52,6 @@ async function connectRedis() {
 
 module.exports = {
   redisClient,
+  redisConfig,
   connectRedis,
 };

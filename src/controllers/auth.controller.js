@@ -9,6 +9,7 @@ const {
 } = require("../utils/token.utils");
 
 const Outbox = require("../models/outbox.model");
+const getOutboxQueue = require("../queues/outbox.queue");
 const runInTransaction = require("../utils/dbTransaction.utils");
 const { success, error } = require("../utils/apiResponse.utils");
 const { isRateLimited } = require("../services/rateLimiter.service");
@@ -41,6 +42,7 @@ async function userRegisterController(req, res) {
     }
 
     let user;
+    let outboxEventId;
 
     await runInTransaction(async (session) => {
       const [createdUser] = await User.create([{ email, name, password }], {
@@ -49,7 +51,7 @@ async function userRegisterController(req, res) {
 
       user = createdUser;
 
-      await Outbox.create(
+      const [outboxEvent] = await Outbox.create(
         [
           {
             eventName: "REGISTRATION_SUCCESS",
@@ -62,7 +64,37 @@ async function userRegisterController(req, res) {
         ],
         { session },
       );
+
+      outboxEventId = outboxEvent._id.toString();
     });
+
+    if (outboxEventId) {
+      try {
+        const outboxQueue = getOutboxQueue();
+
+        if (!outboxQueue) {
+          logger.warn("Queue unavailable");
+          return;
+        }
+
+        await outboxQueue.add(
+          "registration-email",
+
+          {
+            outboxId: outboxEventId,
+          },
+
+          {
+            jobId: outboxEventId,
+          },
+        );
+      } catch (err) {
+        logger.error("Queue enqueue failed", {
+          outboxEventId,
+          error: err.message,
+        });
+      }
+    }
 
     const token = generateToken(user._id);
     setTokenCookie(res, token);

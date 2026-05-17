@@ -26,16 +26,7 @@ const outboxSchema = new mongoose.Schema(
       default: 0,
     },
 
-    nextRetryAt: {
-      type: Date,
-      index: true,
-    },
-
     processedAt: {
-      type: Date,
-    },
-
-    lockedAt: {
       type: Date,
     },
 
@@ -46,7 +37,7 @@ const outboxSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-outboxSchema.index({ status: 1, nextRetryAt: 1, lockedAt: 1 });
+outboxSchema.index({ status: 1, retryCount: 1 });
 
 const Outbox = mongoose.model("Outbox", outboxSchema);
 
