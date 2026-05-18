@@ -1,169 +1,120 @@
 # LedgerFlow Backend
 
-A **Node.js** backend application for managing accounts, transactions, and ledgers.
+JWT Authentication • Redis Caching • BullMQ Workers • Transactional Outbox • Idempotency • Double Entry Ledger • MongoDB Transactions
 
-LedgerFlow is a production-oriented fintech backend simulation implementing distributed caching, idempotency protection, transactional outbox pattern, immutable double-entry ledger architecture, Redis-backed scalability, and asynchronous event-driven workflows.
+Production-oriented fintech backend simulation built with Node.js, MongoDB, Redis, and BullMQ.
 
-## Features
+Implements Redis-backed caching, idempotency protection, transactional outbox pattern, immutable double-entry ledger architecture, async event processing, and recovery-safe financial transaction workflows.
 
-### Financial Transaction System
+Production deployed on Render with Redis + MongoDB Atlas integration. Initial cold start may take 30–50 seconds.
 
-- Double-entry ledger system (DEBIT/CREDIT) ensuring accounting correctness
-- Immutable ledger entries preventing financial record tampering
-- MongoDB transactions for atomic debit/credit consistency
-- Snapshot-based balance system for O(1) balance reads
+## Links
+
+- API Docs: https://ledgerflow-backend-lufu.onrender.com/api-docs
+- Backend: https://ledgerflow-backend-lufu.onrender.com/
+- GitHub Repository: https://github.com/anshu0714/ledgerflow-backend
+
+---
+
+## Core Features
+
+### Financial System
+
+- Immutable double-entry ledger system
+- Atomic MongoDB transactions
+- Snapshot-based O(1) balance reads
 - Cursor-paginated transaction history
+- Deterministic account locking for concurrency safety
 
-### Idempotency & Exactly-Once Simulation
+### Reliability & Consistency
 
-- Dedicated idempotency layer with request hashing
-- Concurrency-safe duplicate request handling
-- Transaction-safe idempotency persistence using MongoDB sessions
-- Prevents duplicate financial transactions under retries
+- Idempotency layer with request hashing
+- Exactly-once transaction simulation
+- Transactional outbox pattern
+- BullMQ async event processing
+- Recovery worker for missing queue jobs
+- Dead-letter handling with retry backoff
+- Redis graceful degradation support
+- Recovery-safe queue restoration after crashes/restarts
 
-### Redis Scalability Layer
+### Scalability
 
-- Redis-backed distributed caching
-- Redis-backed distributed rate limiting
-- Shared rate limiting across multiple instances
-- Automatic cache invalidation after balance-changing operations
+- Redis distributed caching
+- Redis distributed rate limiting
+- Automatic cache invalidation
+- Shared Redis-backed infrastructure
 
-### Outbox Pattern & Async Reliability
+### Security & Observability
 
-- Transactional outbox pattern for reliable async side effects
-- Background worker processes events asynchronously
-- Retry handling with delayed retries
-- Dead-letter handling for permanently failed events
-- Reliable email processing independent of API requests
-
-### Authentication & Security
-
-- JWT-based authentication
-- Secure token extraction middleware
-- Token blacklisting for logout protection
-- Route-level authorization checks
-- Request validation using Zod schemas
-
-### Concurrency & Consistency
-
-- Deterministic account locking strategy
-- Prevents race conditions and double-spending
-- Transaction-safe balance updates
-- Consistent balance validation under concurrent requests
-
-### Observability & Production Hardening
-
+- JWT authentication
+- Token blacklisting
+- Zod request validation
 - Structured JSON logging
-- Request tracing using request IDs
-- API request duration monitoring
-- Background worker monitoring
-- System health logging
-- Graceful async failure handling
+- Request tracing with request IDs
+- API monitoring & health logging
 
-## Architecture Highlights
+---
 
-### Idempotency Flow
+## Architecture Flows
 
-Client Request → Idempotency Layer → Transaction Service → MongoDB Transaction
+### Transaction Flow
 
-- Prevents duplicate financial operations
-- Safely handles retries and concurrent duplicate requests
-- Guarantees exactly-once transaction simulation
-
-### Transaction + Ledger Flow
-
-Transaction → Balance Snapshot Update → Immutable Ledger Entries → Commit
-
-- Ledger acts as immutable audit history
-- Account balance acts as optimized read model
-- Guarantees atomic financial consistency
-
-### Redis Cache Flow
-
-Balance Request → Redis Cache → MongoDB Fallback → Cache Population
-
-- O(1) cached balance retrieval
-- Reduced database load
-- Automatic cache invalidation after transactions
-
-### Outbox Event Flow
-
-Transaction Commit → Outbox Event → Background Worker → Email Processing
-
-- Ensures reliable async side effects
-- Supports retry recovery after failures
-- Failed events moved to dead-letter state after retry exhaustion
+```text
+Client Request
+    ↓
+Idempotency Layer
+    ↓
+MongoDB Transaction
+    ↓
+Balance Snapshot Update
+    ↓
+Immutable Ledger Entry
+    ↓
+Outbox Event
+    ↓
+BullMQ Worker
+    ↓
+Email/Event Processing
+```
 
 ### Failure Recovery
 
-- Crash after DB commit → outbox event still processed
-- Duplicate request → response replayed safely
-- Email provider failure → retried asynchronously
-- Permanent failures isolated using dead-letter handling
+- Duplicate requests safely replay responses
+- Queue recovery restores missing jobs
+- Failed jobs retried with exponential backoff
+- Permanent failures moved to dead-letter state
+- Redis outages handled gracefully
 
-## Technologies Used
+---
 
-- **Node.js** & **Express.js**
-- **MongoDB** & **Mongoose**
-- **Redis**
-- **JWT Authentication**
-- **Zod Validation**
-- **Nodemailer** for email notifications
-- **Swagger/OpenAPI**
-- **Docker**
+## Tech Stack
 
-## Folder Structure
+- Node.js & Express.js
+- MongoDB & Mongoose
+- Redis
+- BullMQ
+- JWT Authentication
+- Zod Validation
+- Nodemailer
+- Swagger/OpenAPI
+- Docker
 
-```
+---
+
+## Project Structure
+
+```bash
 src/
-├── config
-│   ├── db.js
-│   ├── redis.js
-├── controllers
-│   ├── account.controller.js
-│   ├── auth.controller.js
-│   └── transaction.controller.js
-├── middlewares
-│   ├── auth.middleware.js
-│   ├── logger.middleware.js
-│   ├── rateLimiter.middleware.js
-│   ├── requestId.middleware.js
-│   ├── validate.middleware.js
-│   └── validateQuery.middleware.js
-├── models
-│   ├── account.model.js
-│   └── idempotencyKey.model.js
-│   ├── ledger.model.js
-│   ├── outbox.model.js
-│   ├── tokenBlacklist.model.js
-│   ├── transaction.model.js
-│   └── user.model.js
-├── routes
-│   ├── account.routes.js
-│   ├── auth.routes.js
-│   └── transaction.routes.js
-├── services
-│   ├── cache.service.js
-│   ├── rateLimiter.service.js
-│   ├── idempotency.service.js
-│   ├── transaction.service.js
-│   ├── mail.service.js
-│   └── outbox/
-├── utils
-│   ├── dbTransaction.utils.js
-│   ├── apiResponse.utils.js
-│   ├── hash.utils.js
-│   ├── logger.utils.js
-│   └── token.utils.js
-├── validators
-│   ├── account.validator.js
-│   ├── auth.validator.js
-│   ├── common.validator.js
-│   ├── history.validator.js
-│   └── transaction.validator.js
-└── workers
-    ├── outbox.worker.js
-    └── startOutbox.worker.js
+├── config/
+├── controllers/
+├── middlewares/
+├── models/
+├── queues/
+├── routes/
+├── services/
+├── utils/
+├── validators/
+└── workers/
 ```
 
 ## Installation
@@ -227,13 +178,6 @@ USER_EMAIL=<user-email>
 REFRESH_TOKEN=<your-refresh-token>
 ```
 
-**Note:**
-
-- Generate `JWT_SECRET` using [jwtsecrets.com](https://jwtsecrets.com) or any secure random string.
-- For `MONGO_URI`, see [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) for setup instructions.
-- For `CLIENT_ID`, `CLIENT_SECRET`, and `REFRESH_TOKEN`, follow [Google OAuth2](https://github.com/ankurdotio/Difference-Backend-video/tree/main/025-googleoauth) setup guides.
-- Use a temporary email for `USER_EMAIL` in development to protect your privacy.
-
 ## Running the Project
 
 Make sure:
@@ -260,35 +204,11 @@ Swagger API Docs:
 http://localhost:3000/api-docs
 ```
 
-## System Design Concepts Implemented
+Production Docs:
 
-- CQRS-lite balance snapshot architecture
-- Distributed caching using Redis
-- Distributed rate limiting
-- Exactly-once transaction simulation
-- Transactional outbox pattern
-- Dead-letter event handling
-- Immutable double-entry ledger system
-- Deterministic account locking
-- Async background job processing
-- Retry orchestration with backoff
-
-## Production-Level Features
-
-- Distributed Redis caching
-- Distributed Redis rate limiting
-- Snapshot balance architecture
-- Transaction-safe balance updates
-- Immutable financial ledger
-- Dead-letter queue handling
-- Background async workers
-- Structured request tracing
-- Centralized logging
-- Retry orchestration
-- Request validation
-- Swagger API documentation
-- Cursor pagination
-- Transaction idempotency
+```bash
+https://ledgerflow-backend-lufu.onrender.com/api-docs
+```
 
 ## API Endpoints
 
@@ -312,20 +232,6 @@ http://localhost:3000/api-docs
 - `POST /api/auth/register` — Register user
 - `POST /api/auth/login` — Login user
 - `POST /api/auth/logout` — Logout user
-
-## API Documentation
-
-Swagger documentation available at:
-
-```bash
-http://localhost:3000/api-docs
-```
-
-Production:
-
-```bash
-https://ledgerflow-backend-lufu.onrender.com/api-docs
-```
 
 ## License
 
